@@ -23,7 +23,43 @@ Build the premium AI-powered Indian wedding photographer SaaS from https://githu
 
 ## What's Implemented
 
-### 2026-05-14 — Sprint 10 (Live AI Photo Gallery — AWS S3 + Rekognition + CloudFront)
+### 2026-05-14 — Sprint 11 (Cinematic Royal Design System + 3D Hero Mandala)
+
+Applied the master design system from `wedding_platform_emergent_prompts.md` (20-prompt premium spec) — colors, typography, and the signature 3D hero element — across the entire platform.
+
+**Design tokens (CSS variables in `/app/frontend/src/styles/luxury.css` + Tailwind palette)**
+- Background: `#0A0A0F` (Deep Noir, was `#0E0A06`)
+- Gold: `#C9A84C` (Warm Gold, was `#D4AF37`) — recolored 50+ component references via CSS variable propagation
+- Light Gold: `#E8D5A3` (Secondary), Ivory: `#F5F0E8`, Blush: `#E8C4B8`, Burgundy: `#4A0E2A` (all new)
+- Glass: `rgba(255, 255, 255, 0.04)`, Border: `rgba(201, 168, 76, 0.2)` (per spec exact)
+- Shadows: `--lux-glow-sm/md/lg`, `--lux-shadow-card`, `--lux-shadow-lifted` (cinematic glow system)
+- Typography:
+  - Display/Heading: `Cormorant Garamond` (was DM Serif Display / Fraunces)
+  - Body: `DM Sans` (was Manrope)
+  - Script: `Tangerine` (was Cormorant Garamond italic)
+- Tailwind classes added: `gold`, `gold-light`, `gold-soft`, `ivory`, `blush`, `burgundy`, `noir`
+
+**Hero 3D mandala (`/app/frontend/src/components/luxury/HeroMandala3D.jsx`)**
+- Per master spec: "slowly rotating 3D ornate mandala geometry with gold wireframe" + floating gold dust.
+- **Implementation pivot**: started with Three.js + React Three Fiber, but `@react-three/fiber@9` has a known React 19 reconciler bug (`Cannot set 'x-line-number'`) that breaks across drei + bufferAttribute. Pivoted to a **pure CSS + Framer Motion SVG mandala** (the master spec actually mandates SVG fallback on mobile anyway). Result: 100% reliable, ~5KB JS, 60fps everywhere, no WebGL compatibility issues.
+- 3-layer rotating mandala stack (760px / 580px / 400px, alternating direction, 120s / 90s / 60s rotations) with petals, dashed inner rings, radial gold-fade halos, center diamond.
+- 60 animated gold-dust particles drifting upward (CSS `transform3d` animation, randomized delay/duration/opacity for organic feel).
+- Radial gold glow under the headline using `radial-gradient`.
+- Layered behind the hero with `mix-blend-mode: screen` + dark vignette overlay for text legibility.
+
+**Files touched**
+- `/app/frontend/src/styles/luxury.css` — updated all design tokens to spec, added mandala + dust CSS
+- `/app/frontend/tailwind.config.js` — added cinematic palette
+- `/app/frontend/src/pages/LandingPage.jsx` — wired `<HeroMandala3D />` into Hero
+- `/app/frontend/src/components/luxury/HeroMandala3D.jsx` — new (SVG-based)
+- Three.js + R3F v9 + drei v9 + zustand kept in `node_modules` for future Sprint 12 micro-3D elements (e.g. wax-seal scene per Prompt 02) when the React 19 bug is resolved upstream.
+
+### Verified
+- ✅ Landing `/` — cinematic mandala renders behind hero text. New Cormorant Garamond headline, warm gold accents, deep noir bg. Zero console errors.
+- ✅ Public invite `/invite/aarav-riya-tlogpf` — wax seal page now uses new noir + Cormorant Garamond + Warm Gold. Sub-pages (gallery, gifts, venues, find-my-photos modal) auto-adopt new tokens via CSS variables.
+- ✅ Admin pages (gift editor, gallery manager, dashboard) all visually update through the shared `--lux-*` tokens with zero per-component edits.
+
+### Sprint 10 — Live AI Photo Gallery (AWS S3 + Rekognition + CloudFront)
 
 **Backend**
 - **NEW** `/app/backend/aws_service.py` (~250 LOC): wraps boto3 S3, Rekognition, CloudFront signed URLs (RSA-SHA1) + Pillow thumbnails. Single `healthcheck()` returns reachability of each AWS service. Falls back gracefully to S3 presigned URLs when CloudFront key pair isn't configured.

@@ -6,6 +6,7 @@ import {
   Heart, Music, Image as ImageIcon, QrCode, Globe2, MessageCircle, Star,
 } from 'lucide-react';
 import '../styles/luxury.css';
+import HeroMandala3D from '../components/luxury/HeroMandala3D';
 
 /* ──────────────────────────────────────────────────────────────
    Premium B2B SaaS Landing for Indian Wedding Photographers
@@ -102,7 +103,10 @@ const Hero = ({ onLogin }) => {
   const reduce = useReducedMotion();
 
   return (
-    <section ref={ref} className="relative min-h-screen flex flex-col justify-center pt-32 pb-24 px-6 md:px-16">
+    <section ref={ref} className="relative min-h-screen flex flex-col justify-center pt-32 pb-24 px-6 md:px-16 overflow-hidden">
+      {/* Sprint 11 — Cinematic 3D rotating gold mandala + dust */}
+      <HeroMandala3D />
+
       {/* Decorative orbits */}
       <div className="lux-orbit" style={{ width: 720, height: 720, top: -180, right: -180 }} />
       <div className="lux-orbit" style={{ width: 1100, height: 1100, top: -360, right: -360, opacity: 0.5 }} />

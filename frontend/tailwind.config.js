@@ -52,7 +52,16 @@ module.exports = {
   				'3': 'hsl(var(--chart-3))',
   				'4': 'hsl(var(--chart-4))',
   				'5': 'hsl(var(--chart-5))'
-  			}
+  			},
+  			gold: {
+  				DEFAULT: '#C9A84C',
+  				light: '#E8D5A3',
+  				soft: '#A88838'
+  			},
+  			ivory: '#F5F0E8',
+  			blush: '#E8C4B8',
+  			burgundy: '#4A0E2A',
+  			noir: '#0A0A0F'
   		},
   		keyframes: {
   			'accordion-down': {

@@ -4,7 +4,7 @@
    Royal Heritage palette · cinematic motion · glass-morphism
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Cinzel:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=DM+Serif+Display:ital@0;1&family=Manrope:wght@200;300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Cinzel:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Manrope:wght@200;300;400;500;600;700&family=Tangerine:wght@400;700&display=swap');
 
 :root {
   /* Royal Heritage core palette */
@@ -19,19 +19,27 @@
   --lux-onyx: #16110C;
   --lux-night: #0E0A06;
 
-  /* Surfaces (dark-first cinematic) */
-  --lux-bg: #0E0A06;
-  --lux-bg-2: #1A130B;
-  --lux-surface: rgba(255, 248, 220, 0.04);
-  --lux-surface-2: rgba(255, 248, 220, 0.07);
-  --lux-border: rgba(212, 175, 55, 0.18);
-  --lux-border-strong: rgba(212, 175, 55, 0.4);
+  /* Surfaces (dark-first cinematic — Sprint 11 design spec) */
+  --lux-bg: #0A0A0F;
+  --lux-bg-2: #0D0D14;
+  --lux-surface: rgba(255, 255, 255, 0.04);
+  --lux-surface-2: rgba(255, 255, 255, 0.07);
+  --lux-border: rgba(201, 168, 76, 0.2);
+  --lux-border-strong: rgba(201, 168, 76, 0.5);
+  --lux-blush: #E8C4B8;
+  --lux-burgundy: #4A0E2A;
+
+  --lux-glow-sm: 0 0 20px rgba(201, 168, 76, 0.15);
+  --lux-glow-md: 0 0 40px rgba(201, 168, 76, 0.2);
+  --lux-glow-lg: 0 0 80px rgba(201, 168, 76, 0.25);
+  --lux-shadow-card: 0 24px 64px rgba(0, 0, 0, 0.4);
+  --lux-shadow-lifted: 0 40px 80px rgba(0, 0, 0, 0.5);
 
   /* Typography */
-  --font-display: 'DM Serif Display', 'Cinzel', serif;
-  --font-heading: 'Fraunces', 'Cormorant Garamond', serif;
-  --font-body: 'Manrope', system-ui, sans-serif;
-  --font-script: 'Cormorant Garamond', serif;
+  --font-display: 'Cormorant Garamond', 'DM Serif Display', serif;
+  --font-heading: 'Cormorant Garamond', 'Fraunces', serif;
+  --font-body: 'DM Sans', 'Manrope', system-ui, sans-serif;
+  --font-script: 'Tangerine', 'Cormorant Garamond', cursive;
 
   /* Motion easings (cinematic) */
   --ease-cinema: cubic-bezier(0.22, 1, 0.36, 1);
@@ -197,4 +205,88 @@
 /* Mobile reductions for heavy motion */
 @media (max-width: 768px) {
   .lux-glass { backdrop-filter: blur(10px); }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Sprint 11 — 3D Hero Mandala canvas (cinematic master design)
+   ───────────────────────────────────────────────────────────── */
+.hero-mandala-3d {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.95;
+  mix-blend-mode: screen;
+}
+.hero-mandala-3d canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+/* Subtle vignette so text stays legible over 3D */
+.hero-mandala-3d::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 50%,
+              rgba(10, 10, 15, 0.35) 0%,
+              rgba(10, 10, 15, 0.75) 70%,
+              rgba(10, 10, 15, 0.9) 100%);
+  pointer-events: none;
+}
+@media (max-width: 768px) {
+  .hero-mandala-3d { opacity: 0.7; }
+}
+
+/* Mandala stack — perfectly centered, layered, GPU-accelerated */
+.hero-mandala-3d .mandala-stack {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 0;
+}
+.hero-mandala-3d .mandala-svg {
+  position: absolute;
+  filter: drop-shadow(0 0 24px rgba(201, 168, 76, 0.25));
+  will-change: transform;
+}
+.hero-mandala-3d .mandala-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 55%,
+              rgba(201, 168, 76, 0.18) 0%,
+              rgba(201, 168, 76, 0.06) 28%,
+              transparent 55%);
+  pointer-events: none;
+}
+
+/* Gold dust particles */
+.hero-mandala-3d .gold-dust-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.hero-mandala-3d .gold-dust {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, #E8D5A3 0%, #C9A84C 60%, transparent 100%);
+  box-shadow: 0 0 6px rgba(232, 213, 163, 0.65);
+  animation-name: dustFloat;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+}
+@keyframes dustFloat {
+  0%   { transform: translate3d(0, 0, 0)         scale(0.8); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translate3d(20px, -120vh, 0) scale(1.4); opacity: 0; }
+}
+@media (max-width: 768px) {
+  .hero-mandala-3d .mandala-svg { transform-origin: center; }
+  .hero-mandala-3d::after { background: radial-gradient(ellipse at center,
+                                          rgba(10, 10, 15, 0.4) 0%,
+                                          rgba(10, 10, 15, 0.85) 70%); }
 }
