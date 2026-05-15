@@ -24,7 +24,50 @@
 - 5 highest-impact pages were fully rewritten with hero treatments matching the master spec prompts.
 
 ## What's been implemented (Jan 15, 2026)
-**Master design system**
+
+### Session 2026-05-15 — PROMPTS 05+13, 07, 16 (E1 continuation)
+
+**Prompt 05 + 13 — Live Photo Gallery + Guest Upload**
+- New backend module `/app/backend/live_gallery_features.py` registered at `/api/...`
+- WebSocket: `wss://<host>/api/ws/gallery/{wedding_id_or_slug}` — ConnectionManager pattern,
+  broadcasts `{type:photo_added|photo_deleted, ...}` on every upload/delete.
+- Endpoints: `POST /api/admin/profiles/{id}/live-gallery/upload` (multipart, multiple files,
+  generates 800px WebP thumb + 200px micro via Pillow), `POST /api/invite/{slug}/gallery/guest-upload`
+  (auto-publishes), `GET /api/public/gallery/{slug}/photos`, `GET /api/admin/profiles/{id}/live-gallery/photos`,
+  `DELETE /api/admin/profiles/{id}/live-gallery/{photo_id}`, `GET /api/uploads/weddings/{wedding_id}/{folder}/{filename}`.
+- MongoDB collection `live_gallery_photos` { id, profile_id, wedding_id, url, thumb_url, micro_url, source, guest_name, caption, width, height, file_size, created_at }
+- Frontend: rewrote `src/components/luxury/LivePhotoWallTeaser.jsx` (native WebSocket with 3s
+  reconnect, CSS-columns masonry, animated spring-in for new photos, full-screen lightbox with
+  arrow nav). New `src/components/luxury/GuestUploadButton.jsx` (floating gold pill bottom-right,
+  modal with name + file picker + caption + success animation). Mounted in `LuxuryPublicInvitation.jsx`
+  after cinematic opening. New management page `src/pages/LiveGalleryManagement.jsx` (drag-drop
+  via react-dropzone + concurrent uploads + progress bars + stats tiles + delete).
+
+**Prompt 07 — Wishes Wall + Moderation + Featured**
+- New backend module `/app/backend/wishes_features.py`. Endpoints: `POST /api/invite/{slug}/wishes`
+  (public, rate-limit 3/IP/wedding/day via `wish_rate_limits`), `GET /api/public/invite/{slug}/wishes`
+  (approved only, featured first), `GET /api/admin/profiles/{id}/wishes?status=`, approve / reject /
+  feature (max 3 featured, auto-rotate oldest, auto-approves) / bulk-approve / delete.
+- Frontend: new `src/components/luxury/WishesWallSection.jsx` (replaces old inline guest book on
+  public invitation) — 3 burgundy `#4A0E2A` spotlight cards for featured wishes (gold-bordered with
+  sparkle badge), CSS-columns masonry for approved wishes, "Leave a Wish" gold CTA opens modal.
+  Rewrote `src/pages/WishesManagement.jsx` (luxury hero, Pending/Approved/Rejected tabs with red
+  badge on pending count, action buttons per wish, "Approve All Pending" bulk).
+
+**Prompt 16 — Analytics deep-dive**
+- New backend module `/app/backend/analytics_extras.py`. Endpoints: heatmap (90 days), funnel
+  (4 stages), geography (top 10 cities), `POST /api/admin/profiles/{id}/analytics/ai-insights`
+  (Claude Sonnet 4.5 via Emergent LLM key, 24h cache in `ai_insights_cache`).
+- Frontend: new `src/components/luxury/AnalyticsExtrasSection.jsx` mounted at top of
+  `Phase30AnalyticsPage.jsx` — AI Insights gold-bordered card with 3 bullet insights + shimmer
+  skeleton + "Refresh" button, D3.js calendar heatmap (90 days, tooltip hover), custom-SVG
+  RSVP funnel (animated Framer Motion bars + drop-off %), recharts horizontal BarChart for
+  top 10 cities, "Export PDF Report" using jspdf + jspdf-autotable. Also wrapped legacy
+  analytics error state to still render the new section.
+
+**Verified by testing subagent**: 23/23 backend tests pass (5 NoRegression + 7 LiveGallery + 8 Wishes + 3 Analytics + AI insights cache hit). No critical issues. All endpoints respond correctly via curl + browser.
+
+
 - `src/styles/luxury-overrides.css` — global overrides for shadcn `bg-card`, gray/white surfaces, brand
   rose→gold, status colors, tables, inputs, headings, button gradients.
 - `src/index.js` imports both `luxury.css` + `luxury-overrides.css` globally.
