@@ -11809,6 +11809,13 @@ premium_router = build_premium_router(
 app.include_router(premium_router)
 
 # =====================================================================
+# Prompt 14 — Personalized Guest Experience
+# =====================================================================
+from guest_features import build_guest_router
+guest_router = build_guest_router(db=db, require_admin=require_admin)
+app.include_router(guest_router, prefix="/api")
+
+# =====================================================================
 # Sprint 8 — Smart Venue / Per-event maps / What3Words / Live ETA
 # =====================================================================
 from map_features import build_map_router

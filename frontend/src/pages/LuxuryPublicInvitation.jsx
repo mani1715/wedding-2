@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import axios from 'axios';
 import { Calendar, MapPin, Send, Heart, MessageCircle, Clock, Sparkles, Lock } from 'lucide-react';
@@ -16,6 +16,7 @@ import GiftRegistrySection from '@/components/luxury/GiftRegistrySection';
 import LivePhotoWallTeaser from '@/components/luxury/LivePhotoWallTeaser';
 import FindMyPhotosModal from '@/components/luxury/FindMyPhotosModal';
 import MajaReferralCTA from '@/components/luxury/MajaReferralCTA';
+import PersonalizedWelcome from '@/components/luxury/PersonalizedWelcome';
 import { getThemeById } from '@/themes/masterThemes';
 import '@/styles/luxury.css';
 
@@ -23,6 +24,8 @@ const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 const LuxuryPublicInvitation = () => {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const guestToken = searchParams.get('g');
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -126,6 +129,9 @@ const LuxuryPublicInvitation = () => {
   return (
     <WaxSealOpening monogram={monogram} subtitle={`${bride} & ${groom}`} ctaLabel="Open Invitation" storageKey={`invite-${slug}-opened`}>
       <div className="luxe min-h-screen relative" data-testid="public-invitation">
+        {/* Prompt 14 — Personalized welcome (only if ?g=token in URL) */}
+        {guestToken && <PersonalizedWelcome slug={slug} token={guestToken} />}
+
         {watermark && <WatermarkOverlay />}
 
         {/* Hero */}

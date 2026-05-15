@@ -20,7 +20,7 @@ import SuperAdminLogin from './pages/SuperAdminLogin';
 import LuxurySuperAdminDashboard from './pages/LuxurySuperAdminDashboard';
 
 // Existing functional sub-pages (kept for routing — body class wraps make them luxe)
-import RSVPManagement from './pages/RSVPManagement';
+import RSVPManagement from './pages/RSVPManagement';import GuestListManager from './pages/GuestListManager';
 import Phase30AnalyticsPage from './pages/Phase30AnalyticsPage';
 import GreetingsManagement from './pages/GreetingsManagement';
 import WishesManagement from './pages/WishesManagement';
@@ -97,6 +97,7 @@ function App() {
 
                 {/* Functional sub-pages (unchanged) */}
                 <Route path="/admin/profile/:profileId/rsvps" element={<RSVPManagement />} />
+                <Route path="/admin/profile/:profileId/guests" element={<GuestListManager />} />
                 <Route path="/admin/profile/:profileId/analytics" element={<Phase30AnalyticsPage />} />
                 <Route path="/admin/profile/:profileId/greetings" element={<GreetingsManagement />} />
                 <Route path="/admin/profile/:profileId/wishes" element={<WishesManagement />} />

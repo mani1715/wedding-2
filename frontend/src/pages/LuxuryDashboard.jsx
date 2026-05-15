@@ -5,7 +5,7 @@ import axios from 'axios';
 import {
   Crown, LogOut, Plus, Wallet, Sparkles, Camera, Heart, Calendar,
   ExternalLink, Edit3, Trash2, Eye, ArrowUpRight, Search, Layers, MessageCircle, Image as ImageIcon,
-  Wand2, Gift,
+  Wand2, Gift, Users,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import AIStoryComposer from '@/components/luxury/AIStoryComposer';
@@ -225,6 +225,7 @@ const LuxuryDashboard = () => {
                       <div className="mt-auto flex flex-wrap gap-2 text-xs">
                         <ActionBtn onClick={() => goEdit(p)}     icon={Edit3}      label="Edit"      testid={`edit-${p.id}`} />
                         <ActionBtn onClick={() => goRsvp(p)}     icon={MessageCircle} label="RSVPs"  testid={`rsvp-${p.id}`} />
+                        <ActionBtn onClick={() => navigate(`/admin/profile/${p.id}/guests`)} icon={Users} label="Guest List" testid={`guests-${p.id}`} />
                         <ActionBtn onClick={() => goAnalytics(p)} icon={Eye}        label="Insights" testid={`analytics-${p.id}`} />
                         <ActionBtn onClick={() => navigate(`/admin/profile/${p.id}/ai-studio`)}     icon={Wand2}    label="AI Studio"  testid={`ai-${p.id}`} />
                         <ActionBtn onClick={() => navigate(`/admin/profile/${p.id}/live-gallery`)}  icon={Camera}   label="Live Wall"  testid={`live-${p.id}`} />
