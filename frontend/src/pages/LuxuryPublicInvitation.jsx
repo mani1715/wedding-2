@@ -4,6 +4,7 @@ import { motion, useScroll, useTransform } from 'framer-motion';
 import axios from 'axios';
 import { Calendar, MapPin, Send, Heart, MessageCircle, Clock, Sparkles, Lock } from 'lucide-react';
 import WaxSealOpening from '@/components/luxury/WaxSealOpening';
+import CinematicOpening from '@/components/luxury/CinematicOpening';
 import PetalConfetti from '@/components/luxury/PetalConfetti';
 import AmbientMusicPlayer from '@/components/luxury/AmbientMusicPlayer';
 import WatermarkOverlay from '@/components/luxury/WatermarkOverlay';
@@ -71,6 +72,15 @@ const LuxuryPublicInvitation = () => {
     } finally { setLoading(false); }
   };
 
+  // Prompt 02 — Cinematic opening hooks (must be called unconditionally)
+  const [openingDone, setOpeningDone] = useState(false);
+  const formattedDate = React.useMemo(() => {
+    if (!data?.event_date) return '';
+    try {
+      return new Date(data.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (_) { return ''; }
+  }, [data?.event_date]);
+
   if (loading) {
     return <div className="luxe min-h-screen grid place-items-center"><MandalaLoader label="Opening invitation" /></div>;
   }
@@ -127,10 +137,22 @@ const LuxuryPublicInvitation = () => {
   const story = data.love_story || data.story || '';
 
   return (
-    <WaxSealOpening monogram={monogram} subtitle={`${bride} & ${groom}`} ctaLabel="Open Invitation" storageKey={`invite-${slug}-opened`}>
-      <div className="luxe min-h-screen relative" data-testid="public-invitation">
+    <>
+      {/* Prompt 02 — Cinematic 5-stage opening (every visit) */}
+      {!openingDone && (
+        <CinematicOpening
+          bride={bride}
+          groom={groom}
+          date={formattedDate}
+          monogram={monogram}
+          onComplete={() => setOpeningDone(true)}
+        />
+      )}
+
+      <div className="luxe min-h-screen relative" data-testid="public-invitation"
+        style={{ visibility: openingDone ? 'visible' : 'hidden' }}>
         {/* Prompt 14 — Personalized welcome (only if ?g=token in URL) */}
-        {guestToken && <PersonalizedWelcome slug={slug} token={guestToken} />}
+        {guestToken && openingDone && <PersonalizedWelcome slug={slug} token={guestToken} />}
 
         {watermark && <WatermarkOverlay />}
 
@@ -295,7 +317,7 @@ const LuxuryPublicInvitation = () => {
         <PetalConfetti trigger={wishDone ? Date.now() : false} count={26} duration={4200} />
         <FindMyPhotosModal slug={slug} open={findOpen} onClose={() => setFindOpen(false)} />
       </div>
-    </WaxSealOpening>
+    </>
   );
 };
 
