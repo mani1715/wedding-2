@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './context/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
-
 // Public + landing
 import LandingPage from './pages/LandingPage';
 import LuxuryPreview from './pages/LuxuryPreview';
@@ -50,6 +49,12 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import './App.css';
 
 function App() {
+  React.useEffect(() => {
+    // Apply luxury cinematic theme globally to all pages
+    document.body.classList.add('luxe', 'luxe-grain', 'luxe-vignette');
+    return () => document.body.classList.remove('luxe', 'luxe-grain', 'luxe-vignette');
+  }, []);
+
   return (
     <ErrorBoundary>
       <HelmetProvider>

@@ -11864,7 +11864,10 @@ try:
         except Exception:
             pass
 except Exception as _e:
-    logger.warning("APScheduler init failed: %s", _e)
+    try:
+        logger.warning("APScheduler init failed: %s", _e)
+    except Exception:
+        print(f"APScheduler init failed: {_e}")
 
 # Include the router in the main app
 app.include_router(api_router)

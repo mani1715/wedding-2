@@ -29,6 +29,7 @@ async def init_admin():
     # Create admin user
     admin = Admin(
         email="admin@wedding.com",
+        name="Demo Photographer",
         password_hash=get_password_hash("admin123")
     )
     

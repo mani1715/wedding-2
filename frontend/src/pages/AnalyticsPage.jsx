@@ -84,7 +84,7 @@ const AnalyticsPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="luxe min-h-screen flex items-center justify-center">
         <p className="text-gray-600">Loading analytics...</p>
       </div>
     );
@@ -92,7 +92,7 @@ const AnalyticsPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="luxe min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
           <button
@@ -139,7 +139,7 @@ const AnalyticsPage = () => {
   const COLORS = ['#10b981', '#8b5cf6', '#f59e0b'];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="luxe min-h-screen py-8 px-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">

@@ -56,12 +56,12 @@ const QRCodeManagement = () => {
 
   if (error || !profile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50 p-6">
+      <div className="luxe min-h-screen p-6">
         <div className="max-w-4xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <p className="text-red-600 mb-4">{error || 'Profile not found'}</p>
-            <Button onClick={() => navigate('/admin/dashboard')}>
-              Back to Dashboard
+          <div className="lux-glass p-8 text-center">
+            <p className="mb-4" style={{ color: '#F08585' }}>{error || 'Profile not found'}</p>
+            <Button onClick={() => navigate('/admin/dashboard')} className="lux-btn">
+              Back to Studio
             </Button>
           </div>
         </div>
@@ -73,24 +73,26 @@ const QRCodeManagement = () => {
   const enabledEvents = profile.events?.filter(e => e.event_enabled) || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50">
-      <div className="max-w-5xl mx-auto p-6">
+    <div className="luxe min-h-screen relative" data-testid="qr-management">
+      <div className="lux-orbit" style={{ width: 700, height: 700, top: -200, right: -200 }} />
+      <div className="relative z-10 max-w-5xl mx-auto p-6 md:p-12">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-10">
           <Button
             variant="ghost"
             onClick={() => navigate('/admin/dashboard')}
-            className="mb-4"
+            className="lux-btn lux-btn-ghost text-xs mb-6"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
+            Back to Studio
           </Button>
 
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            QR Code Generator
+          <span className="lux-eyebrow block mb-4">◆ Scan · Share · Celebrate</span>
+          <h1 className="font-display text-[2.4rem] md:text-[3.8rem] leading-[1.04]" style={{ color: '#FFF8DC' }}>
+            QR <span className="font-script italic text-gold">codes</span> for every guest
           </h1>
-          <p className="text-gray-600">
-            {profile.bride_name} & {profile.groom_name}
+          <p className="mt-4 text-base" style={{ color: 'rgba(255,248,220,0.65)' }}>
+            {profile.bride_name} &amp; {profile.groom_name}
           </p>
         </div>
 

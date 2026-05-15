@@ -1033,7 +1033,7 @@ const PublicInvitation = () => {
   // Show loading if language data not loaded yet
   if (!languageData && !error) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-background, #FFF8E7)' }}>
+      <div className="luxe min-h-screen flex items-center justify-center" style={{ background: 'var(--color-background, #FFF8E7)' }}>
         <p style={{ color: 'var(--color-text, #4A3728)' }}>Loading...</p>
       </div>
     );
@@ -1233,7 +1233,7 @@ const PublicInvitation = () => {
       {/* Main Content - Positioned above background */}
       <main 
         id="main-content"
-        className="min-h-screen" 
+        className="luxe min-h-screen" 
         style={{ 
           position: 'relative',
           zIndex: 1,

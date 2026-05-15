@@ -105,7 +105,7 @@ function WishesManagement() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center">
+      <div className="luxe min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin inline-block w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full"></div>
           <p className="mt-4 text-gray-600">Loading wishes...</p>
@@ -115,7 +115,7 @@ function WishesManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 py-8 px-4">
+    <div className="luxe min-h-screen py-8 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">

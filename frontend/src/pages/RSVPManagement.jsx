@@ -1,12 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import axios from 'axios';
-import { ArrowLeft, Download, Filter, Users, CheckCircle, XCircle, HelpCircle } from 'lucide-react';
+import {
+  ArrowLeft, Download, Users, CheckCircle2, XCircle, HelpCircle, Sparkles,
+  Search, Mail,
+} from 'lucide-react';
+import '@/styles/luxury.css';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 28, filter: 'blur(8px)' },
+  visible: (i = 0) => ({
+    opacity: 1, y: 0, filter: 'blur(0px)',
+    transition: { duration: 0.9, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] },
+  }),
+};
 
 const RSVPManagement = () => {
   const navigate = useNavigate();
@@ -16,46 +27,36 @@ const RSVPManagement = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [query, setQuery] = useState('');
   const [profileInfo, setProfileInfo] = useState(null);
 
   useEffect(() => {
-    if (!admin) {
-      navigate('/admin/login');
-      return;
-    }
+    if (!admin) { navigate('/admin/login'); return; }
     fetchData();
+    // eslint-disable-next-line
   }, [admin, profileId, filter]);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      // Fetch profile info
       const profileResponse = await axios.get(`${API_URL}/api/admin/profiles/${profileId}`);
       setProfileInfo(profileResponse.data);
-
-      // Fetch RSVPs with optional filter
       const filterParam = filter !== 'all' ? `?status=${filter}` : '';
       const rsvpsResponse = await axios.get(`${API_URL}/api/admin/profiles/${profileId}/rsvps${filterParam}`);
-      setRsvps(rsvpsResponse.data);
-
-      // Fetch stats
+      setRsvps(rsvpsResponse.data || []);
       const statsResponse = await axios.get(`${API_URL}/api/admin/profiles/${profileId}/rsvps/stats`);
       setStats(statsResponse.data);
     } catch (error) {
       console.error('Failed to fetch RSVP data:', error);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleExport = async () => {
     try {
       const response = await axios.get(
         `${API_URL}/api/admin/profiles/${profileId}/rsvps/export`,
-        {
-          responseType: 'blob'
-        }
+        { responseType: 'blob' }
       );
-
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -65,219 +66,205 @@ const RSVPManagement = () => {
       link.remove();
     } catch (error) {
       console.error('Failed to export RSVPs:', error);
-      alert('Failed to export RSVPs');
     }
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'yes':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'no':
-        return <XCircle className="w-5 h-5 text-red-600" />;
-      case 'maybe':
-        return <HelpCircle className="w-5 h-5 text-yellow-600" />;
-      default:
-        return null;
-    }
+  const STATUS_META = {
+    yes:   { label: 'Joyfully Attending',   icon: CheckCircle2, color: '#6FCF97' },
+    no:    { label: 'Attending in Spirit',  icon: XCircle,       color: '#F08585' },
+    maybe: { label: 'Considering',          icon: HelpCircle,    color: '#E8C766' },
   };
 
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case 'yes':
-        return 'Attending';
-      case 'no':
-        return 'Not Attending';
-      case 'maybe':
-        return 'Maybe';
-      default:
-        return status;
-    }
-  };
+  const filtered = rsvps.filter((r) =>
+    !query || (r.guest_name || '').toLowerCase().includes(query.toLowerCase()) ||
+    (r.guest_phone || '').toLowerCase().includes(query.toLowerCase())
+  );
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'yes':
-        return 'text-green-600 bg-green-50';
-      case 'no':
-        return 'text-red-600 bg-red-50';
-      case 'maybe':
-        return 'text-yellow-600 bg-yellow-50';
-      default:
-        return 'text-gray-600 bg-gray-50';
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">Loading RSVPs...</p>
-      </div>
-    );
-  }
+  const STATS_CARDS = stats ? [
+    { value: stats.total_rsvps, label: 'Total RSVPs', accent: 'var(--lux-gold)' },
+    { value: stats.attending_count, label: 'Attending', accent: '#6FCF97' },
+    { value: stats.not_attending_count, label: 'Regrets', accent: '#F08585' },
+    { value: stats.maybe_count, label: 'Maybe', accent: '#E8C766' },
+    { value: stats.total_guest_count, label: 'Total Guests', accent: 'var(--lux-blush)' },
+  ] : [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/admin/dashboard')}
-            className="mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
+    <div className="luxe min-h-screen relative" data-testid="rsvp-management">
+      <div className="lux-orbit" style={{ width: 700, height: 700, top: -180, right: -180 }} />
+      <div className="lux-orbit" style={{ width: 1100, height: 1100, top: -380, right: -380, opacity: 0.45 }} />
 
-          <div className="flex justify-between items-start">
+      <div className="relative z-10 max-w-[1400px] mx-auto px-6 md:px-12 py-10">
+        <button
+          onClick={() => navigate('/admin/dashboard')}
+          className="lux-btn lux-btn-ghost text-xs mb-6"
+          data-testid="rsvp-back-btn"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Studio
+        </button>
+
+        {/* Hero */}
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="mb-12">
+          <span className="lux-eyebrow block mb-4">◆ Guest List · Sacred Confirmations</span>
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-800">RSVP Management</h1>
+              <h1 className="font-display text-[2.6rem] md:text-[4.2rem] leading-[1.02]" style={{ color: '#FFF8DC' }}>
+                Every <span className="text-gold font-script italic">presence</span><br/>becomes a blessing.
+              </h1>
               {profileInfo && (
-                <p className="text-gray-600 mt-2">
-                  {profileInfo.groom_name} & {profileInfo.bride_name} - {new Date(profileInfo.event_date).toLocaleDateString()}
+                <p className="mt-5 text-base max-w-xl" style={{ color: 'rgba(255,248,220,0.65)' }}>
+                  Tracking RSVPs for <span className="text-gold">{profileInfo.groom_name} &amp; {profileInfo.bride_name}</span> ·
+                  {profileInfo.event_date && ` ${new Date(profileInfo.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`}
                 </p>
               )}
             </div>
-            <Button onClick={handleExport} className="bg-rose-600 hover:bg-rose-700 text-white">
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button onClick={handleExport} className="lux-btn" data-testid="rsvp-export-btn">
+                <Download className="w-4 h-4" /> Export CSV
+              </button>
+              <a
+                href={`/invite/${profileInfo?.share_link || profileInfo?.slug || ''}`}
+                target="_blank"
+                rel="noreferrer"
+                className="lux-btn lux-btn-ghost"
+              >
+                <Mail className="w-4 h-4" /> View Invitation
+              </a>
+            </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Statistics */}
+        {/* Stat tiles */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-            <Card className="p-6 text-center">
-              <div className="text-3xl font-bold text-gray-800">{stats.total_rsvps}</div>
-              <div className="text-sm text-gray-600 mt-1">Total RSVPs</div>
-            </Card>
-            <Card className="p-6 text-center bg-green-50">
-              <div className="text-3xl font-bold text-green-600">{stats.attending_count}</div>
-              <div className="text-sm text-gray-600 mt-1">Attending</div>
-            </Card>
-            <Card className="p-6 text-center bg-red-50">
-              <div className="text-3xl font-bold text-red-600">{stats.not_attending_count}</div>
-              <div className="text-sm text-gray-600 mt-1">Not Attending</div>
-            </Card>
-            <Card className="p-6 text-center bg-yellow-50">
-              <div className="text-3xl font-bold text-yellow-600">{stats.maybe_count}</div>
-              <div className="text-sm text-gray-600 mt-1">Maybe</div>
-            </Card>
-            <Card className="p-6 text-center bg-blue-50">
-              <div className="text-3xl font-bold text-blue-600">{stats.total_guest_count}</div>
-              <div className="text-sm text-gray-600 mt-1">
-                <Users className="w-4 h-4 inline mr-1" />
-                Total Guests
-              </div>
-            </Card>
-          </div>
+          <motion.div
+            variants={fadeUp} initial="hidden" animate="visible" custom={1}
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-12"
+            data-testid="rsvp-stats"
+          >
+            {STATS_CARDS.map((c, i) => (
+              <motion.div
+                key={c.label}
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.15 + i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                className="luxe-stat-tile"
+                style={{ '--accent': c.accent }}
+                data-testid={`rsvp-stat-${c.label.toLowerCase().replace(/ /g, '-')}`}
+              >
+                <div className="luxe-stat-value" style={{ background: `linear-gradient(180deg, ${c.accent}, #8C6A1A)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  {c.value ?? 0}
+                </div>
+                <div className="luxe-stat-label">{c.label}</div>
+              </motion.div>
+            ))}
+          </motion.div>
         )}
 
-        {/* Filter */}
-        <div className="mb-6 flex gap-2">
-          <Button
-            onClick={() => setFilter('all')}
-            variant={filter === 'all' ? 'default' : 'outline'}
-            className={filter === 'all' ? 'bg-rose-600 text-white' : ''}
-          >
-            <Filter className="w-4 h-4 mr-2" />
-            All ({stats?.total_rsvps || 0})
-          </Button>
-          <Button
-            onClick={() => setFilter('yes')}
-            variant={filter === 'yes' ? 'default' : 'outline'}
-            className={filter === 'yes' ? 'bg-green-600 text-white' : ''}
-          >
-            Attending ({stats?.attending_count || 0})
-          </Button>
-          <Button
-            onClick={() => setFilter('no')}
-            variant={filter === 'no' ? 'default' : 'outline'}
-            className={filter === 'no' ? 'bg-red-600 text-white' : ''}
-          >
-            Not Attending ({stats?.not_attending_count || 0})
-          </Button>
-          <Button
-            onClick={() => setFilter('maybe')}
-            variant={filter === 'maybe' ? 'default' : 'outline'}
-            className={filter === 'maybe' ? 'bg-yellow-600 text-white' : ''}
-          >
-            Maybe ({stats?.maybe_count || 0})
-          </Button>
-        </div>
+        {/* Filter + search */}
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={2} className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'all', label: 'All', count: stats?.total_rsvps },
+              { id: 'yes', label: 'Attending', count: stats?.attending_count },
+              { id: 'no',  label: 'Regrets',   count: stats?.not_attending_count },
+              { id: 'maybe', label: 'Maybe',   count: stats?.maybe_count },
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className="px-4 py-2 rounded-full text-xs tracking-[0.18em] uppercase transition-all"
+                style={filter === f.id
+                  ? { background: '#D4AF37', color: '#16110C', fontWeight: 600 }
+                  : { background: 'transparent', border: '1px solid var(--lux-border)', color: 'rgba(255,248,220,0.75)' }}
+                data-testid={`rsvp-filter-${f.id}`}
+              >
+                {f.label} <span className="opacity-60 ml-1">({f.count ?? 0})</span>
+              </button>
+            ))}
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,248,220,0.5)' }} />
+            <input
+              type="search" placeholder="Search guest name or phone…"
+              value={query} onChange={(e) => setQuery(e.target.value)}
+              className="pl-10 pr-4 py-2.5 rounded-full text-sm w-72"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--lux-border)', color: '#FFF8DC' }}
+              data-testid="rsvp-search"
+            />
+          </div>
+        </motion.div>
 
-        {/* RSVP List */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            {filter === 'all' ? 'All RSVPs' : `${getStatusLabel(filter)} RSVPs`}
-          </h2>
-          
-          {rsvps.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No RSVPs found</p>
+        {/* Table */}
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={3} className="lux-glass overflow-hidden" data-testid="rsvp-table-card">
+          {loading ? (
+            <div className="p-16 text-center">
+              <div className="lux-mandala mx-auto" />
+              <p className="mt-6 text-sm" style={{ color: 'rgba(255,248,220,0.6)' }}>Gathering confirmations…</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="p-20 text-center">
+              <Sparkles className="w-10 h-10 mx-auto mb-4" style={{ color: 'var(--lux-gold)' }} />
+              <h3 className="font-display text-2xl mb-2" style={{ color: '#FFF8DC' }}>No confirmations yet</h3>
+              <p className="text-sm" style={{ color: 'rgba(255,248,220,0.6)' }}>Share your invitation to begin gathering blessings.</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Guest Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Phone
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Guests
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Message
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Submitted
-                    </th>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--lux-border)' }}>
+                    {['Guest', 'Phone', 'Status', 'Party Size', 'Message', 'Received'].map((h) => (
+                      <th key={h} className="text-left px-6 py-4 text-[0.7rem] tracking-[0.25em] uppercase"
+                          style={{ color: 'var(--lux-gold)', fontWeight: 500 }}>
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {rsvps.map((rsvp) => (
-                    <tr key={rsvp.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{rsvp.guest_name}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{rsvp.guest_phone}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(rsvp.status)}`}>
-                          {getStatusIcon(rsvp.status)}
-                          <span className="ml-1">{getStatusLabel(rsvp.status)}</span>
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {rsvp.status === 'yes' ? rsvp.guest_count : '-'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm text-gray-500 max-w-xs truncate">
-                          {rsvp.message || '-'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {new Date(rsvp.created_at).toLocaleDateString()}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                <tbody>
+                  {filtered.map((rsvp, idx) => {
+                    const meta = STATUS_META[rsvp.status] || { label: rsvp.status, icon: HelpCircle, color: '#E8C766' };
+                    const IconEl = meta.icon;
+                    return (
+                      <motion.tr
+                        key={rsvp.id}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: idx * 0.03, ease: [0.22, 1, 0.36, 1] }}
+                        style={{ borderBottom: '1px solid var(--lux-border)' }}
+                        className="hover:bg-[rgba(212,175,55,0.04)] transition-colors"
+                        data-testid={`rsvp-row-${idx}`}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="font-heading text-base" style={{ color: '#FFF8DC' }}>{rsvp.guest_name}</div>
+                        </td>
+                        <td className="px-6 py-4 text-sm" style={{ color: 'rgba(255,248,220,0.65)' }}>{rsvp.guest_phone || '—'}</td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs tracking-[0.15em] uppercase"
+                                style={{ background: `${meta.color}1F`, color: meta.color, border: `1px solid ${meta.color}40` }}>
+                            <IconEl className="w-3.5 h-3.5" /> {meta.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm" style={{ color: '#FFF8DC' }}>
+                          {rsvp.status === 'yes' ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <Users className="w-3.5 h-3.5" style={{ color: 'var(--lux-gold)' }} />
+                              {rsvp.guest_count || 1}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-6 py-4 text-sm italic max-w-xs truncate" style={{ color: 'rgba(255,248,220,0.7)' }} title={rsvp.message}>
+                          {rsvp.message ? `“${rsvp.message}”` : '—'}
+                        </td>
+                        <td className="px-6 py-4 text-xs tracking-widest uppercase" style={{ color: 'rgba(255,248,220,0.5)' }}>
+                          {rsvp.created_at ? new Date(rsvp.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
-        </Card>
+        </motion.div>
       </div>
     </div>
   );

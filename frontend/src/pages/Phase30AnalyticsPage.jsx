@@ -56,12 +56,12 @@ import UpgradeModal from '@/components/UpgradeModal';
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 const COLORS = {
-  primary: '#3B82F6',
-  success: '#10B981',
-  warning: '#F59E0B',
-  danger: '#EF4444',
-  purple: '#8B5CF6',
-  pink: '#EC4899',
+  primary: '#D4AF37',
+  success: '#6FCF97',
+  warning: '#E8C766',
+  danger: '#F08585',
+  purple: '#C3A3E3',
+  pink: '#E8C4B8',
 };
 
 const Phase30AnalyticsPage = () => {
@@ -191,10 +191,10 @@ const Phase30AnalyticsPage = () => {
 
   if (loading && !analytics) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="luxe min-h-screen flex items-center justify-center" data-testid="analytics-loading">
         <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-2" />
-          <p className="text-gray-600">Loading analytics...</p>
+          <div className="lux-mandala mx-auto" />
+          <p className="mt-6 text-sm" style={{ color: 'rgba(255,248,220,0.6)' }}>Reading the cosmos…</p>
         </div>
       </div>
     );
@@ -202,14 +202,11 @@ const Phase30AnalyticsPage = () => {
 
   if (error && !analytics) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Back to Dashboard
+      <div className="luxe min-h-screen flex items-center justify-center">
+        <div className="text-center lux-glass p-10">
+          <p className="text-red-300 mb-4">{error}</p>
+          <button onClick={() => navigate('/admin/dashboard')} className="lux-btn">
+            Back to Studio
           </button>
         </div>
       </div>
@@ -226,45 +223,41 @@ const Phase30AnalyticsPage = () => {
   const topEventsData = analytics?.rsvp?.rsvp_by_event || [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="luxe min-h-screen relative" data-testid="analytics-page">
+      <div className="lux-orbit" style={{ width: 800, height: 800, top: -240, right: -240 }} />
+
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="relative z-10 sticky top-0 backdrop-blur-md" style={{ background: 'rgba(10,10,15,0.85)', borderBottom: '1px solid var(--lux-border)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => navigate('/admin/dashboard')}
-                className="p-2 hover:bg-gray-100 rounded-md"
+                className="lux-btn lux-btn-ghost text-xs"
+                data-testid="analytics-back"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-4 h-4" /> Back
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Analytics & Insights</h1>
-                <p className="text-sm text-gray-500">Guest behavior and engagement metrics</p>
+                <span className="lux-eyebrow block mb-1">◆ Phase 30 · Guest Intelligence</span>
+                <h1 className="font-display text-2xl md:text-3xl" style={{ color: '#FFF8DC' }}>
+                  Analytics &amp; <span className="font-script italic text-gold">Insights</span>
+                </h1>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center space-x-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
+            <div className="flex items-center gap-3">
+              <button onClick={handleRefresh} disabled={refreshing} className="lux-btn lux-btn-ghost text-xs">
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
               </button>
-              <button
-                onClick={handleExport}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center space-x-2"
-              >
-                <Download className="w-4 h-4" />
-                <span>Export CSV</span>
+              <button onClick={handleExport} className="lux-btn text-xs">
+                <Download className="w-4 h-4" /> Export CSV
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Filters</h2>

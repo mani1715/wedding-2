@@ -46,7 +46,7 @@ export const InvitationViewer = () => {
   };
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
+    <div className="luxe relative min-h-screen overflow-x-hidden">
       {/* Background Music */}
       <audio
         ref={audioRef}

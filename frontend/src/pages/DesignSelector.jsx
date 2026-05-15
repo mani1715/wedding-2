@@ -76,15 +76,17 @@ export const DesignSelector = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-rose-50 to-blue-50 py-12 px-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="luxe min-h-screen relative py-16 px-4" data-testid="design-selector">
+      <div className="lux-orbit" style={{ width: 900, height: 900, top: -300, left: -300 }} />
+      <div className="relative z-10 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12 animate-fade-in">
-          <h1 className="font-elegant text-5xl md:text-6xl font-bold text-gray-800 mb-4">
-            Choose Your Wedding Invitation Design
+        <div className="text-center mb-16">
+          <span className="lux-eyebrow block mb-5">◆ Choose Your Story's Canvas</span>
+          <h1 className="font-display text-5xl md:text-7xl leading-[1.04]" style={{ color: '#FFF8DC' }}>
+            Eight cinematic <span className="text-gold font-script italic">worlds</span>
           </h1>
-          <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
-            Select a design style that reflects your special celebration
+          <p className="mt-5 text-base md:text-lg max-w-2xl mx-auto" style={{ color: 'rgba(255,248,220,0.65)' }}>
+            Locked layouts. Curated motion. Pick the soul of your wedding story.
           </p>
         </div>
 
@@ -95,7 +97,7 @@ export const DesignSelector = () => {
             return (
               <Card
                 key={design.id}
-                className="group relative overflow-hidden cursor-pointer transition-all duration-500 hover:shadow-2xl hover:-translate-y-2"
+                className="lux-glass group relative overflow-hidden cursor-pointer transition-all duration-700 hover:-translate-y-2"
                 style={{
                   animationDelay: `${index * 0.1}s`
                 }}
@@ -103,27 +105,27 @@ export const DesignSelector = () => {
                 onMouseLeave={() => setHoveredDesign(null)}
                 onClick={() => navigate(`/invitation/${design.id}`)}
               >
-                {/* Background Gradient */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${design.gradient} opacity-70 group-hover:opacity-100 transition-opacity duration-500`} />
-                
+                {/* Background Gradient — luxury veil */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${design.gradient} opacity-20 group-hover:opacity-35 transition-opacity duration-700 mix-blend-overlay`} />
+
                 {/* Content */}
-                <div className="relative p-6 h-full flex flex-col">
+                <div className="relative p-7 h-full flex flex-col">
                   <div className="flex-1">
-                    <div className="mb-4">
-                      <Icon className="w-10 h-10 text-gray-700 group-hover:scale-110 transition-transform duration-300" />
+                    <div className="mb-5 w-12 h-12 rounded-xl grid place-items-center"
+                      style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.18), rgba(139,0,0,0.18))', border: '1px solid var(--lux-border-strong)' }}>
+                      <Icon className="w-5 h-5 transition-transform duration-500 group-hover:scale-110" style={{ color: '#D4AF37' }} />
                     </div>
-                    <h3 className="font-elegant text-xl font-semibold text-gray-800 mb-2">
+                    <h3 className="font-display text-2xl mb-2" style={{ color: '#FFF8DC' }}>
                       {design.name}
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,248,220,0.6)' }}>
                       {design.description}
                     </p>
                   </div>
-                  
+
                   <Button
-                    variant="outline"
-                    className={`mt-4 w-full bg-white/80 hover:bg-white transition-all duration-300 ${
-                      hoveredDesign === design.id ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+                    className={`lux-btn lux-btn-ghost mt-6 justify-center transition-all duration-500 ${
+                      hoveredDesign === design.id ? 'opacity-100 translate-y-0' : 'opacity-60 translate-y-1'
                     }`}
                   >
                     View Design
@@ -139,6 +141,14 @@ export const DesignSelector = () => {
           <p className="text-sm">
             Each design can be customized with optional spiritual themes or kept universal
           </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DesignSelector;
+   </p>
         </div>
       </div>
     </div>

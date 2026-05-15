@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "@/index.css";
+import "@/styles/luxury.css";
+import "@/styles/luxury-overrides.css";
 import App from "@/App";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
