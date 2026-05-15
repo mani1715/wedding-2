@@ -52,6 +52,7 @@ import {
 // PHASE 33: Feature Gating
 import LockedFeatureIndicator from '@/components/LockedFeatureIndicator';
 import UpgradeModal from '@/components/UpgradeModal';
+import AnalyticsExtrasSection from '@/components/luxury/AnalyticsExtrasSection';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -202,12 +203,17 @@ const Phase30AnalyticsPage = () => {
 
   if (error && !analytics) {
     return (
-      <div className="luxe min-h-screen flex items-center justify-center">
-        <div className="text-center lux-glass p-10">
-          <p className="text-red-300 mb-4">{error}</p>
-          <button onClick={() => navigate('/admin/dashboard')} className="lux-btn">
-            Back to Studio
+      <div className="luxe min-h-screen relative" data-testid="analytics-page-degraded">
+        <div className="px-4 md:px-12 py-10 max-w-7xl mx-auto">
+          <button onClick={() => navigate('/admin/dashboard')} className="lux-btn lux-btn-ghost mb-6 inline-flex items-center gap-2">
+            <ArrowLeft className="w-4 h-4" /> Back
           </button>
+          <span className="lux-eyebrow block mb-3">◆ Guest Intelligence</span>
+          <h1 className="font-display text-[2.2rem] md:text-[3.6rem] leading-[1.05] mb-3" style={{ color: '#FFF8DC' }}>
+            Analytics &amp; <span className="font-script italic text-gold">Insights</span>
+          </h1>
+          {/* PROMPT 16 — render new analytics even when legacy endpoint errors */}
+          <AnalyticsExtrasSection profileId={profileId} />
         </div>
       </div>
     );
@@ -258,6 +264,9 @@ const Phase30AnalyticsPage = () => {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* PROMPT 16 — AI Insights, heatmap, funnel, geography, PDF export */}
+        <AnalyticsExtrasSection profileId={profileId} profileName={analytics?.profile_name} />
+
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Filters</h2>

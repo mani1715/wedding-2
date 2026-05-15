@@ -1,0 +1,60 @@
+{
+  "summary": "Prompts 05+13 (Live Photo Gallery + WebSocket), 07 (Wishes Wall + Moderation), and 16 (Analytics deep-dive) — 23/23 backend pytest pass. WebSocket /api/ws/gallery/{slug} accepts connections and emits {type:connected, wedding_id:<resolved>}. Photographer multi-file upload creates orig.jpg + thumb_*.webp (800px) + micro_*.webp (200px) under /app/uploads/weddings/{wedding_id}/gallery/ and broadcasts. Guest upload at /api/invite/{slug}/gallery/guest-upload (multipart file + guest_name + caption) auto-publishes to /guest_uploads/ and broadcasts. Public list returns newest first, supports since-filter. Admin list returns photographer_count + guest_count + total + storage_bytes. Delete removes files + db row + broadcasts deletion. File-serving endpoint /api/uploads/weddings/.. returns 200 with correct image/* content-type. Wishes: POST /api/invite/{slug}/wishes rate-limits at 3/IP/wedding/day (verified 429 on 4th). Admin filtered list returns counts {pending,approved,rejected,featured}. Approve / Reject / Feature work; feature toggle auto-approves & enforces MAX_FEATURED=3 (auto-rotate oldest). Bulk-approve returns {approved:int}. Delete works. Public /api/public/invite/{slug}/wishes returns only approved, featured-first ordering verified, ip_hash stripped. Analytics: heatmap returns 91 day rows for days=90 with {date:YYYY-MM-DD, opens:int}; funnel returns 4 named stages monotonically non-increasing; geography returns {cities:[{city,country,count}]} ≤10; AI insights via Emergent LLM key returns 1-3 strings + generated_at; second call within 24h returns identical generated_at (cache hit confirmed). No-regression: /api/auth/login, GET /api/admin/profiles, GET /api/invite/{slug} all still pass. Unauthorised admin call returns 401/403.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/invite/{slug}/wishes",
+        "issue": "Rate-limit collection wish_rate_limits is keyed by sha256(client_ip)[:24] but x-forwarded-for is only used when request.client.host is empty/None. When the backend sits behind a reverse proxy (which it does in production via Kubernetes ingress), request.client.host will always be the proxy IP, meaning ALL guests share the same rate-limit bucket (3 wishes/day for the whole internet). Suggest preferring X-Forwarded-For first when present."
+      },
+      {
+        "endpoint": "GET /api/public/invite/{slug}/wishes",
+        "issue": "Sort key uses datetime.fromisoformat on approved_at OR created_at without timezone handling for both — works today because all dates are ISO+tz, but a single legacy naive timestamp will raise TypeError comparing aware vs naive. Wrap in try/except or normalise to epoch float of 0 on failure."
+      },
+      {
+        "endpoint": "POST /api/admin/profiles/{id}/analytics/ai-insights",
+        "issue": "Cache check uses datetime.fromisoformat(cached['generated_at']) then .replace(tzinfo=utc) — if the stored string already has +00:00 (it does, because _now_iso includes tz), then .replace overwrites the actual tz with UTC. Functionally fine today but fragile if generated_at ever stored in non-UTC. Use 'if gen.tzinfo is None: gen = gen.replace(tzinfo=utc)' instead."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_prompts_05_07_16_gallery_wishes_analytics.py",
+    "/app/test_reports/pytest/prompts_05_07_16_results.xml"
+  ],
+  "action_items": [
+    "(Recommend) wishes_features.py:75 — prefer X-Forwarded-For for IP detection so rate-limit isn't global behind a reverse proxy.",
+    "(Recommend) wishes_features.py:116 — wrap datetime.fromisoformat in try/except to tolerate legacy naive timestamps in approved_at/created_at.",
+    "(Minor) live_gallery_features.py:343 — /api/uploads/.. serves files without ETag / Cache-Control headers; recommend Cache-Control: public, max-age=31536000, immutable since the filename is content-addressed (uuid4 hex)."
+  ],
+  "critical_code_review_comments": [
+    "live_gallery_features.py:172-195 — WebSocket loop receives text with 30s timeout then sends heartbeat ping. No client-side pong validation: if a client TCP-disconnects mid-write, send_json will throw and the loop breaks correctly, but the broadcast() path also handles dead sockets. Good. However: there is no auth on the WebSocket — anyone with a slug can subscribe to all upload events including guest_name + caption. For a private wedding this leaks PII (guest names). Recommend optional token query param.",
+    "live_gallery_features.py:218 — _save_image_with_thumbs is fully synchronous (PIL is CPU-bound + blocking). Inside an async upload endpoint it will block the FastAPI event loop for ~50-200ms per image on big uploads. Move into asyncio.to_thread(_save_image_with_thumbs, ...) when files list is long.",
+    "live_gallery_features.py:343-354 — serve_upload trusts wedding_id from URL path and only validates folder ∈ {gallery, guest_uploads}. A user can scan UUIDs to enumerate other weddings' photos. Either gate by `await db.profiles.find_one({id: wedding_id})` and reject if missing, OR use signed URLs.",
+    "wishes_features.py:116 — sort key for public_wishes is correct (featured first then chronological desc) but is O(n log n) Python sort fetching up to 200 docs; for a large wishes table this is fine, but consider doing the sort in Mongo with a compound index on (profile_id, status, is_featured, approved_at).",
+    "wishes_features.py:180-189 — feature toggle: when MAX_FEATURED hit, picks `currently_featured[0]` after sorting by approved_at ASC. Older approved wishes get rotated out — correct. But if a wish has approved_at=None (e.g., featured before being approved via the feature toggle code path itself), it sorts to the top and would be the one rotated out next, which is the OPPOSITE of intent (newest-featured-via-toggle would be killed first). Filter out approved_at=None or coalesce to created_at.",
+    "analytics_extras.py:182 — wishes_count guarded by `'guest_wishes' in await db.list_collection_names()` — list_collection_names is an admin op and is run on every ai-insights call. Drop the guard (count_documents on a missing collection returns 0 in motor).",
+    "analytics_extras.py:225-227 — fallback regex-free parsing of LLM output: 'lines = [l.strip(\"•-* \\t\") for l in resp_text.splitlines() if l.strip()]' will keep markdown like '**Insight:**'. Consider stripping ** and leading '1.'/'1)' patterns.",
+    "All three modules duplicate the _get_profile_owned + _get_profile_by_slug + _strip helpers (live_gallery_features.py:151, wishes_features.py:50, analytics_extras.py:26). Extract into a shared profile_helpers module to avoid drift — e.g., the 'admin_id missing' fallback semantics differ slightly across the three.",
+    "Files length: live_gallery_features.py = 357 lines, wishes_features.py = 210, analytics_extras.py = 248 — all comfortably under the 700-line guideline. Good.",
+    "All three routers correctly exclude mongodb _id via projection or via _strip. No _id leakage observed in responses."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_prompts_05_07_16_gallery_wishes_analytics.py (NEW — 23 tests, all green)",
+    "/app/test_reports/pytest/prompts_05_07_16_results.xml (NEW — JUnit XML)"
+  ],
+  "success_rate": {
+    "backend": "100% (23/23 pytest, 5 NoRegression + 7 LiveGallery + 8 Wishes + 5 Analytics)",
+    "frontend": "n/a (backend-only test request)"
+  },
+  "test_credentials": "admin@wedding.com / admin123 — profile id 122ffd50-a1d0-4583-b2af-43bea70bc815, slug aarav-riya-lp2bq2.",
+  "seed_data_creation": "Tests create then delete: 2 photographer photos, 1 guest photo, 3 TEST_Guest_* wishes. Post-run cleanup verified — 0 TEST_ artifacts remain in db.live_gallery_photos / db.guest_wishes / db.wish_rate_limits. AI-insights cache row was written/refreshed for the profile (24h TTL is by app logic, doc itself persists).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Test file is reusable; the TestWishes class has a class-scoped fixture _reset_wishes_state that purges TEST_ wishes + wish_rate_limits before the wishes tests so it can be re-run multiple times on the same day. WebSocket test uses ws://localhost:8001/api/ws/gallery/{slug} via the `websockets` library (added to env). The Bot/AbusePrevention middleware requires Mozilla UA on all /api/invite/* and /api/public/* calls — already wired via public_session fixture. The Emergent LLM cache (db.ai_insights_cache) is keyed by profile_id only; flush with db.ai_insights_cache.delete_many({'profile_id':...}) if you need a fresh LLM round-trip in a subsequent run.",
+  "rca_of_the_issue": "Initial wishes test run failed (3 of 8 wishes tests) because wish_rate_limits collection already had a count=1 row from prior interactive testing — so the 3rd POST hit 429. Fixed by adding _reset_wishes_state class fixture that (a) deletes any wishes with guest_name startswith 'TEST_' via the admin DELETE endpoint and (b) clears db.wish_rate_limits for the profile via direct pymongo. After fix, all 23 tests pass deterministically on repeat runs. No backend code changes were required — this was purely a test-isolation issue."
+}

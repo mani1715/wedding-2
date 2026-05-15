@@ -15,6 +15,8 @@ import TravelLinksSection from '@/components/luxury/TravelLinksSection';
 import VenuesSection from '@/components/luxury/VenuesSection';
 import GiftRegistrySection from '@/components/luxury/GiftRegistrySection';
 import LivePhotoWallTeaser from '@/components/luxury/LivePhotoWallTeaser';
+import GuestUploadButton from '@/components/luxury/GuestUploadButton';
+import WishesWallSection from '@/components/luxury/WishesWallSection';
 import FindMyPhotosModal from '@/components/luxury/FindMyPhotosModal';
 import MajaReferralCTA from '@/components/luxury/MajaReferralCTA';
 import PersonalizedWelcome from '@/components/luxury/PersonalizedWelcome';
@@ -240,34 +242,8 @@ const LuxuryPublicInvitation = () => {
           </div>
         </ScrollSection>
 
-        {/* Wishes */}
-        <ScrollSection className="px-6 md:px-16 py-24" testid="section-wishes">
-          <div className="max-w-3xl mx-auto">
-            <span className="lux-eyebrow block mb-5">◆ Guest Book</span>
-            <h2 className="font-display text-[2.4rem] md:text-[3.4rem] leading-[1.05] mb-8" style={{ color: '#FFF8DC' }}>
-              A wish for the <span className="text-gold italic font-script">couple.</span>
-            </h2>
-
-            <WishForm slug={slug} onSuccess={() => { setWishDone(true); fetchInvite(); }} />
-
-            {greetings.length > 0 && (
-              <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="wishes-list">
-                {greetings.map((g, i) => (
-                  <motion.div key={g.id || i} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: i * 0.04 }}
-                    className="lux-glass p-5">
-                    <p className="font-heading text-[1rem] leading-relaxed italic mb-3" style={{ color: '#FFF8DC' }}>
-                      “{g.message || g.wish}”
-                    </p>
-                    <div className="text-xs tracking-widest uppercase" style={{ color: 'rgba(255,248,220,0.55)' }}>
-                      — {g.guest_name || g.name || 'A guest'}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </div>
-        </ScrollSection>
+        {/* Wishes — Prompt 07: moderated wishes wall with featured spotlight */}
+        <WishesWallSection slug={slug} />
 
         {/* Phase 38 — Live Photo Wall teaser */}
         <LivePhotoWallTeaser slug={slug} />
@@ -316,6 +292,9 @@ const LuxuryPublicInvitation = () => {
         <PetalConfetti trigger={rsvpDone ? Date.now() : false} count={42} duration={5200} />
         <PetalConfetti trigger={wishDone ? Date.now() : false} count={26} duration={4200} />
         <FindMyPhotosModal slug={slug} open={findOpen} onClose={() => setFindOpen(false)} />
+
+        {/* Prompt 13 — Floating guest upload button (after cinematic opening) */}
+        {openingDone && <GuestUploadButton slug={slug} />}
       </div>
     </>
   );

@@ -11816,6 +11816,29 @@ guest_router = build_guest_router(db=db, require_admin=require_admin)
 app.include_router(guest_router, prefix="/api")
 
 # =====================================================================
+# Prompt 05 + 13 — Live Photo Gallery with WebSocket
+# =====================================================================
+from live_gallery_features import build_live_gallery_router
+live_gallery_router = build_live_gallery_router(db=db, require_admin=require_admin)
+app.include_router(live_gallery_router)
+
+# =====================================================================
+# Prompt 07 — Guest Wishes Wall + Moderation
+# =====================================================================
+from wishes_features import build_wishes_router
+wishes_router = build_wishes_router(db=db, require_admin=require_admin)
+app.include_router(wishes_router)
+
+# =====================================================================
+# Prompt 16 — Analytics deep-dive (heatmap, funnel, geography, AI insights)
+# =====================================================================
+from analytics_extras import build_analytics_extras_router
+analytics_extras_router = build_analytics_extras_router(
+    db=db, require_admin=require_admin, ai_chat_factory=_premium_ai_chat
+)
+app.include_router(analytics_extras_router)
+
+# =====================================================================
 # Sprint 8 — Smart Venue / Per-event maps / What3Words / Live ETA
 # =====================================================================
 from map_features import build_map_router
