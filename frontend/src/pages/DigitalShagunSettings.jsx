@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import axios from 'axios';
-import { ArrowLeft, Gift, Save, Loader2, Heart } from 'lucide-react';
+import { ArrowLeft, Gift, Save, Loader2, Heart, CreditCard, Eye, EyeOff, TrendingUp, Wallet, Lock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import '@/styles/luxury.css';
 
@@ -16,6 +16,8 @@ const DigitalShagunSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [blessings, setBlessings] = useState(null);
+  const [dashboard, setDashboard] = useState(null);
+  const [showSecret, setShowSecret] = useState(false);
 
   useEffect(() => {
     document.body.classList.add('luxe', 'luxe-grain', 'luxe-vignette');
@@ -31,11 +33,13 @@ const DigitalShagunSettings = () => {
 
   const load = async () => {
     try {
-      const [s, p] = await Promise.all([
+      const [s, p, d] = await Promise.all([
         axios.get(`${API_URL}/api/admin/profiles/${profileId}/shagun`),
         axios.get(`${API_URL}/api/admin/profiles/${profileId}`),
+        axios.get(`${API_URL}/api/admin/profiles/${profileId}/shagun/dashboard`).catch(() => ({ data: null })),
       ]);
       setSettings(s.data);
+      setDashboard(d.data);
       // Pull blessing counter via public endpoint using slug
       if (p.data?.slug) {
         try {
@@ -114,6 +118,126 @@ const DigitalShagunSettings = () => {
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
           </button>
         </div>
+
+        {/* Prompt 12 — Razorpay Card / UPI / Wallet (5% platform fee) */}
+        <div className="lux-glass p-6 md:p-8 mt-6" data-testid="dss-razorpay-card">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl grid place-items-center"
+                style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.18), rgba(139,0,0,0.18))', border: '1px solid var(--lux-border-strong)' }}>
+                <CreditCard className="w-5 h-5 text-gold" />
+              </div>
+              <div>
+                <h2 className="font-display text-2xl" style={{ color: '#FFF8DC' }}>
+                  Razorpay <span className="font-script italic text-gold">checkout</span>
+                </h2>
+                <p className="text-[11px] tracking-[0.18em] uppercase" style={{ color: 'rgba(255,248,220,0.55)' }}>
+                  UPI · Cards · Wallets · Net banking
+                </p>
+              </div>
+            </div>
+            <span className="lux-pill">
+              <Lock className="w-3 h-3" /> 5% platform fee
+            </span>
+          </div>
+
+          <ToggleField label="Enable Razorpay checkout" checked={!!settings.razorpay_enabled}
+            onChange={(v) => setSettings({ ...settings, razorpay_enabled: v })} testid="dss-rzp-toggle" />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+            <Field
+              label="Razorpay Key ID"
+              value={settings.razorpay_key_id || ''}
+              onChange={(v) => setSettings({ ...settings, razorpay_key_id: v })}
+              placeholder="rzp_test_xxxxxxxxxxxxxx"
+              testid="dss-rzp-key-id" />
+            <div>
+              <span className="text-[10px] tracking-[0.3em] uppercase block mb-1" style={{ color: 'rgba(255,248,220,0.55)' }}>Razorpay Key Secret</span>
+              <div className="relative">
+                <input
+                  type={showSecret ? 'text' : 'password'}
+                  value={settings.razorpay_key_secret || ''}
+                  onChange={(e) => setSettings({ ...settings, razorpay_key_secret: e.target.value })}
+                  placeholder="••••••••••••••••••••"
+                  className="w-full px-3 pr-10 py-2.5 rounded-lg bg-transparent outline-none text-sm"
+                  style={{ color: '#FFF8DC', border: '1px solid var(--lux-border)' }}
+                  data-testid="dss-rzp-key-secret" />
+                <button type="button" onClick={() => setShowSecret((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded"
+                  style={{ color: 'rgba(255,248,220,0.55)' }}>
+                  {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 p-4 rounded-lg" style={{ background: 'rgba(212,175,55,0.05)', border: '1px solid var(--lux-border)' }}>
+            <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(255,248,220,0.7)' }}>
+              ↑ Enter <span className="text-gold">your own Razorpay keys</span> (from
+              <a href="https://dashboard.razorpay.com/app/keys" target="_blank" rel="noreferrer"
+                className="text-gold underline mx-1">dashboard.razorpay.com/app/keys</a>).
+              You receive <span className="text-gold">95%</span> of every Shagun directly to your bank.
+              Platform retains <span className="text-gold">5%</span> as service fee.
+              Currency: <span className="text-gold">₹ INR</span> only. Start with <code className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: 'rgba(255,255,255,0.05)' }}>rzp_test_*</code> keys to test.
+            </p>
+          </div>
+
+          <button onClick={save} disabled={saving} className="lux-btn mt-5" data-testid="dss-rzp-save">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save Razorpay Settings
+          </button>
+        </div>
+
+        {/* Earnings Dashboard */}
+        {dashboard && dashboard.total_count > 0 && (
+          <div className="lux-glass p-6 md:p-8 mt-6" data-testid="dss-earnings">
+            <div className="flex items-center gap-3 mb-5">
+              <Wallet className="w-5 h-5 text-gold" />
+              <h2 className="font-display text-2xl" style={{ color: '#FFF8DC' }}>
+                Shagun <span className="font-script italic text-gold">earnings</span>
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+              <Stat label="Total received" value={`₹${(dashboard.total_received || 0).toLocaleString('en-IN')}`} />
+              <Stat label="Platform fee (5%)" value={`₹${Math.round(dashboard.platform_fees || 0).toLocaleString('en-IN')}`} icon={TrendingUp} />
+              <Stat label="Your earnings" value={`₹${Math.round(dashboard.photographer_earnings || 0).toLocaleString('en-IN')}`} icon={Wallet} />
+            </div>
+            {dashboard.records?.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--lux-border)' }}>
+                      {['Guest', 'Amount', 'Method', 'Platform fee', 'Your share', 'Status', 'Date'].map((h) => (
+                        <th key={h} className="text-left px-3 py-3 text-[10px] tracking-[0.25em] uppercase"
+                          style={{ color: 'var(--lux-gold)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.records.slice(0, 20).map((r) => (
+                      <tr key={r.id} style={{ borderBottom: '1px solid var(--lux-border)' }}>
+                        <td className="px-3 py-3" style={{ color: '#FFF8DC' }}>{r.guest_name || 'Anonymous'}</td>
+                        <td className="px-3 py-3 font-medium text-gold">₹{(r.amount || 0).toLocaleString('en-IN')}</td>
+                        <td className="px-3 py-3 text-xs uppercase tracking-wider" style={{ color: 'rgba(255,248,220,0.6)' }}>{r.method || 'upi'}</td>
+                        <td className="px-3 py-3" style={{ color: 'rgba(255,248,220,0.75)' }}>₹{Math.round(r.platform_fee || 0).toLocaleString('en-IN')}</td>
+                        <td className="px-3 py-3 text-gold">₹{Math.round(r.photographer_amount ?? r.amount ?? 0).toLocaleString('en-IN')}</td>
+                        <td className="px-3 py-3">
+                          <span className="text-[10px] tracking-[0.2em] uppercase px-2 py-1 rounded-full"
+                            style={{ background: r.status === 'paid' ? 'rgba(111,207,151,0.15)' : 'rgba(255,255,255,0.05)',
+                                     color: r.status === 'paid' ? '#86EFAC' : 'rgba(255,248,220,0.6)' }}>
+                            {r.status || 'recorded'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-xs" style={{ color: 'rgba(255,248,220,0.5)' }}>
+                          {r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

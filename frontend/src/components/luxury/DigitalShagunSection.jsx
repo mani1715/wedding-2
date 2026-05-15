@@ -90,6 +90,8 @@ const ShagunModal = ({ shagun, slug, couple, onClose, onRecorded }) => {
   const [guestName, setGuestName] = useState('');
   const [message, setMessage] = useState('');
   const [recorded, setRecorded] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [error, setError] = useState('');
 
   const finalAmount = customAmount ? parseInt(customAmount, 10) : amount;
   const upiLink = `upi://pay?pa=${encodeURIComponent(shagun.upi_id)}&pn=${encodeURIComponent(shagun.payee_name || couple || '')}&am=${finalAmount}&cu=INR&tn=${encodeURIComponent('Shagun for ' + (couple || 'the couple'))}`;
@@ -104,6 +106,63 @@ const ShagunModal = ({ shagun, slug, couple, onClose, onRecorded }) => {
       setRecorded(true);
     } catch (_) { /* still let them pay */ }
     window.location.href = upiLink;
+  };
+
+  // Prompt 12 — Razorpay Standard Checkout
+  const loadRazorpayScript = () =>
+    new Promise((resolve) => {
+      if (window.Razorpay) return resolve(true);
+      const s = document.createElement('script');
+      s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      s.onload = () => resolve(true);
+      s.onerror = () => resolve(false);
+      document.body.appendChild(s);
+    });
+
+  const payViaRazorpay = async () => {
+    setError('');
+    if (!guestName.trim()) { setError('Please share your name first 🙏'); return; }
+    if (!finalAmount || finalAmount < 1) { setError('Pick or enter an amount.'); return; }
+    setPaying(true);
+    try {
+      const loaded = await loadRazorpayScript();
+      if (!loaded) throw new Error('Could not load secure checkout');
+      const { data: order } = await axios.post(`${API_URL}/api/invite/${slug}/shagun/razorpay/order`, {
+        amount: finalAmount, guest_name: guestName, message,
+      });
+      const rzp = new window.Razorpay({
+        key: order.key_id,
+        amount: order.amount * 100,
+        currency: 'INR',
+        order_id: order.order_id,
+        name: order.payee_name || couple || 'Wedding Shagun',
+        description: `Shagun blessing of ₹${finalAmount.toLocaleString('en-IN')}`,
+        theme: { color: '#D4AF37' },
+        prefill: { name: guestName },
+        notes: { wedding_slug: slug },
+        handler: async (resp) => {
+          try {
+            await axios.post(`${API_URL}/api/invite/${slug}/shagun/razorpay/verify`, {
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+              amount: finalAmount,
+              guest_name: guestName,
+              message,
+            });
+            onRecorded?.({ amount: finalAmount });
+            setRecorded(true);
+          } catch (e) {
+            setError(e?.response?.data?.detail || 'Payment recorded by Razorpay but server verification failed.');
+          } finally { setPaying(false); }
+        },
+        modal: { ondismiss: () => setPaying(false) },
+      });
+      rzp.open();
+    } catch (e) {
+      setError(e?.response?.data?.detail || e.message || 'Could not start payment.');
+      setPaying(false);
+    }
   };
 
   return (
@@ -151,16 +210,34 @@ const ShagunModal = ({ shagun, slug, couple, onClose, onRecorded }) => {
             style={{ color: '#FFF8DC', border: '1px solid var(--lux-border)' }}
             data-testid="shagun-message" />
         </div>
-        <p className="text-xs mb-4 text-center" style={{ color: 'rgba(255,248,220,0.55)' }}>
-          UPI: <span className="text-gold">{shagun.upi_id}</span>
-        </p>
-        <button onClick={recordAndPay} disabled={!guestName.trim() || finalAmount <= 0} className="lux-btn w-full"
-          data-testid="shagun-pay-now">
-          <Gift className="w-4 h-4" /> Pay ₹{finalAmount?.toLocaleString('en-IN')} via UPI
-        </button>
+
+        {error && (
+          <div className="mb-3 px-3 py-2 rounded text-xs" style={{ background: 'rgba(139,0,0,0.18)', color: '#FFD7C9' }}>
+            {error}
+          </div>
+        )}
+
+        {/* Razorpay primary CTA — cards, UPI, wallets, net banking */}
+        {shagun.razorpay_enabled && (
+          <button onClick={payViaRazorpay} disabled={paying || !guestName.trim() || finalAmount <= 0}
+            className="lux-btn w-full justify-center mb-2"
+            data-testid="shagun-pay-razorpay">
+            <Gift className="w-4 h-4" /> {paying ? 'Opening secure checkout…' : `Bless ₹${finalAmount?.toLocaleString('en-IN')} (UPI · Card · Wallet)`}
+          </button>
+        )}
+
+        {/* Direct UPI fallback */}
+        {shagun.upi_id && (
+          <button onClick={recordAndPay} disabled={!guestName.trim() || finalAmount <= 0}
+            className={`${shagun.razorpay_enabled ? 'lux-btn lux-btn-ghost' : 'lux-btn'} w-full justify-center`}
+            data-testid="shagun-pay-now">
+            <ExternalLink className="w-4 h-4" /> Direct UPI: {shagun.upi_id}
+          </button>
+        )}
+
         {recorded && (
-          <p className="text-xs mt-3 text-center inline-flex items-center gap-1 justify-center w-full" style={{ color: '#86EFAC' }}>
-            <Check className="w-3.5 h-3.5" /> Recorded! Opening UPI app…
+          <p className="text-xs mt-4 text-center inline-flex items-center gap-1 justify-center w-full" style={{ color: '#86EFAC' }}>
+            <Check className="w-3.5 h-3.5" /> Blessing received with love 🙏
           </p>
         )}
       </motion.div>

@@ -141,11 +141,16 @@ class ShagunSettings(BaseModel):
     enabled: bool = True
     upi_id: Optional[str] = None
     payee_name: Optional[str] = None
-    suggested_amounts: List[int] = [501, 1100, 2100, 5100, 11000]
+    suggested_amounts: List[int] = [101, 501, 1001, 2001, 5001, 11000]
     blessing_message: Optional[str] = "Your blessings mean more than any gift. — Riya & Aarav"
     gpay_handle: Optional[str] = None
     phonepe_handle: Optional[str] = None
     paytm_handle: Optional[str] = None
+    # Prompt 12: Razorpay support (per-photographer)
+    razorpay_enabled: bool = False
+    razorpay_key_id: Optional[str] = None
+    razorpay_key_secret: Optional[str] = None
+    platform_fee_percent: float = 5.0
 
 
 # Itinerary
@@ -833,7 +838,7 @@ def build_premium_router(db, get_current_admin, require_admin, ai_chat_factory):
                 "tn": f"Shagun for {couple}",
             }
             return "upi://pay?" + urllib.parse.urlencode(params)
-        suggested = [{"amount": a, "link": upi_link(a)} for a in s.get("suggested_amounts", [501, 1100, 2100])]
+        suggested = [{"amount": a, "link": upi_link(a)} for a in s.get("suggested_amounts", [101, 501, 1001])]
         return {
             "enabled": True,
             "couple": couple,
@@ -844,6 +849,8 @@ def build_premium_router(db, get_current_admin, require_admin, ai_chat_factory):
             "phonepe_handle": s.get("phonepe_handle"),
             "paytm_handle": s.get("paytm_handle"),
             "suggested": suggested,
+            "razorpay_enabled": bool(s.get("razorpay_enabled") and s.get("razorpay_key_id") and s.get("razorpay_key_secret")),
+            "platform_fee_percent": float(s.get("platform_fee_percent", 5.0)),
         }
 
     @router.post("/invite/{slug}/shagun/record")
@@ -887,6 +894,112 @@ def build_premium_router(db, get_current_admin, require_admin, ai_chat_factory):
             "blessing_total_amount": total_amount,
             "wishes_count": wishes_count,
             "recent_blessings": recent,
+        }
+
+    # ========================================================================
+    # PROMPT 12 — Razorpay Shagun (per-photographer keys, 5% platform fee)
+    # ========================================================================
+    @router.post("/invite/{slug}/shagun/razorpay/order")
+    async def create_razorpay_shagun_order(slug: str, payload: Dict[str, Any]):
+        """Create a Razorpay order for a Shagun payment using the photographer's own keys."""
+        import razorpay as _rzp
+        profile = await _get_profile_by_id_or_slug(db, slug)
+        s = profile.get("shagun_settings") or {}
+        if not s.get("razorpay_enabled"):
+            raise HTTPException(status_code=400, detail="Razorpay is not enabled for this wedding")
+        key_id = s.get("razorpay_key_id") or os.environ.get("RAZORPAY_KEY_ID", "rzp_test_PLACEHOLDER")
+        key_secret = s.get("razorpay_key_secret") or os.environ.get("RAZORPAY_KEY_SECRET", "PLACEHOLDER_SECRET")
+        if not key_id or "PLACEHOLDER" in (key_secret or ""):
+            raise HTTPException(status_code=400, detail="Photographer hasn't added Razorpay keys yet")
+        amount = int(payload.get("amount", 0) or 0)
+        if amount < 1:
+            raise HTTPException(status_code=400, detail="Amount must be at least ₹1")
+        try:
+            client = _rzp.Client(auth=(key_id, key_secret))
+            receipt = f"shagun_{uuid.uuid4().hex[:10]}"
+            order = client.order.create({
+                "amount": amount * 100,  # paise
+                "currency": "INR",
+                "receipt": receipt,
+                "payment_capture": 1,
+                "notes": {
+                    "wedding_slug": slug,
+                    "profile_id": profile["id"],
+                    "guest_name": (payload.get("guest_name") or "")[:80],
+                    "message": (payload.get("message") or "")[:200],
+                },
+            })
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Razorpay error: {str(e)[:200]}")
+        return {
+            "order_id": order["id"],
+            "amount": amount,
+            "currency": "INR",
+            "key_id": key_id,
+            "payee_name": s.get("payee_name") or f"{profile.get('groom_name','')} & {profile.get('bride_name','')}",
+        }
+
+    @router.post("/invite/{slug}/shagun/razorpay/verify")
+    async def verify_razorpay_shagun(slug: str, payload: Dict[str, Any]):
+        """Verify a Razorpay payment signature and record the Shagun with 5% platform fee."""
+        import hmac, hashlib as _hashlib
+        profile = await _get_profile_by_id_or_slug(db, slug)
+        s = profile.get("shagun_settings") or {}
+        key_secret = s.get("razorpay_key_secret") or os.environ.get("RAZORPAY_KEY_SECRET", "PLACEHOLDER_SECRET")
+        order_id = payload.get("razorpay_order_id")
+        payment_id = payload.get("razorpay_payment_id")
+        signature = payload.get("razorpay_signature")
+        if not (order_id and payment_id and signature):
+            raise HTTPException(status_code=400, detail="Missing payment fields")
+        # Server-side signature verification
+        expected = hmac.new(
+            (key_secret or "").encode("utf-8"),
+            f"{order_id}|{payment_id}".encode("utf-8"),
+            _hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(expected, signature):
+            raise HTTPException(status_code=400, detail="Signature mismatch")
+        amount = int(payload.get("amount", 0) or 0)
+        platform_fee_pct = float(s.get("platform_fee_percent", 5.0))
+        platform_fee = round(amount * platform_fee_pct / 100.0, 2)
+        photographer_amount = round(amount - platform_fee, 2)
+        doc = {
+            "id": uuid.uuid4().hex,
+            "profile_id": profile["id"],
+            "guest_name": (payload.get("guest_name") or "An anonymous well-wisher")[:80],
+            "amount": amount,
+            "message": (payload.get("message") or "")[:240],
+            "method": "razorpay",
+            "razorpay_order_id": order_id,
+            "razorpay_payment_id": payment_id,
+            "platform_fee_percent": platform_fee_pct,
+            "platform_fee": platform_fee,
+            "photographer_amount": photographer_amount,
+            "status": "paid",
+            "created_at": _now_iso(),
+        }
+        await db.shagun_records.insert_one(doc)
+        _serialize_doc(doc)
+        return {"success": True, "record": doc}
+
+    @router.get("/admin/profiles/{profile_id}/shagun/dashboard")
+    async def shagun_dashboard(profile_id: str, admin_data: dict = Depends(require_admin)):
+        """Photographer's Shagun earnings dashboard (totals + per-Shagun breakdown)."""
+        profile = await _get_profile_by_id_or_slug(db, profile_id)
+        _verify_admin_owns(profile, admin_data)
+        cursor = db.shagun_records.find({"profile_id": profile["id"]}, {"_id": 0}).sort("created_at", -1).limit(200)
+        records = await cursor.to_list(200)
+        total_received = sum(int(r.get("amount", 0) or 0) for r in records)
+        platform_fees = sum(float(r.get("platform_fee", 0) or 0) for r in records)
+        photographer_earnings = sum(float(r.get("photographer_amount", r.get("amount", 0)) or 0) for r in records)
+        paid_count = sum(1 for r in records if r.get("status") == "paid")
+        return {
+            "total_received": total_received,
+            "platform_fees": platform_fees,
+            "photographer_earnings": photographer_earnings,
+            "paid_count": paid_count,
+            "total_count": len(records),
+            "records": records,
         }
 
     # ========================================================================
