@@ -1,130 +1,90 @@
-# Wedding Invitation Platform — Luxury Cinematic Edition
+# Wedding Platform — Monetization Suite (continued from previous session)
 
-## Problem statement
-> User cloned `https://github.com/mani1715/wedding-2` and provided a 20-prompt master design spec
-> (`wedding_platform_emergent_prompts.md`). The 1st prompt (Landing Page) was already implemented
-> as a luxury cinematic experience. The remaining 19 prompts (Wedding Invitation Opening, Couple Story,
-> Event Timeline, Live Gallery, RSVP, Wishes Wall, Music System, Admin Dashboard, Super Admin Panel,
-> Theme Selection, Digital Shagun, Guest Photo Wall, Personalized Guest, Memory Archive, Analytics,
-> WhatsApp, Photo Upload, AI Story, Credits) needed the same luxury design language applied across
-> their corresponding existing pages.
+## Problem Statement
+User cloned `https://github.com/mani1715/wedding-2`. Previous E1 session implemented MONETIZATION features but ran out of credits before testing. Business logic to verify and complete:
 
-## Stack
-- **Backend**: FastAPI (Python 3.11) + MongoDB · JWT auth · 12k LOC `server.py`
-- **Frontend**: React 19 + Vite (CRACO) + Tailwind + Framer Motion + Three.js (R3F)
-- **Design system**: Royal Heritage palette (`#8B0000` crimson · `#D4AF37` champagne gold · `#FFF8DC` ivory)
-  with Cormorant Garamond display, DM Sans body, Tangerine script.
+1. **Three roles**: Photographer, Admin, Super Admin
+2. Super-admin creates photographer credentials (email/password)
+3. Photographer logs in, creates invitations (per-design credit consumption on publish)
+4. **Auto credit top-up** via Razorpay payment → credits added automatically
+5. **Super-admin-configurable Credit Packs** (NOT hardcoded — ₹500=50, ₹1000=120, ₹2500=350 fully editable from UI)
+6. Super-admin can **drill-down** into any photographer to see: profile info, all invitations with public links, credit ledger, payment history, RSVPs/views/revenue
+7. **Public invite links** must NOT crash under viral traffic (preventive caching + bot-whitelist for guest user-agents)
 
-## Architecture decisions
-- Kept the existing 8-design `design_registry.py` backend (each wedding can use 1 of 8 styles).
-- Added a NEW global luxury CSS override layer (`src/styles/luxury-overrides.css`) that automatically
-  transforms any Tailwind `bg-gray-50 / bg-white / text-gray-*` legacy class to dark cinematic surfaces
-  + ivory text + champagne accents when `body.luxe` is active.
-- Applied `body.luxe` globally in `App.js` so every route inherits the cinematic theme.
-- 5 highest-impact pages were fully rewritten with hero treatments matching the master spec prompts.
+## Architecture
+- **Backend**: FastAPI + MongoDB (motor async), JWT auth, Razorpay SDK
+- **Frontend**: React 19 + Tailwind + Framer Motion (luxury "Royal Heritage" theme — burgundy/gold/ivory)
+- **Payment**: Razorpay test keys configured in `/app/backend/.env`
+- **Caching**: `Cache-Control: public, max-age=30, s-maxage=60` on all `/api/invite/*` and `/api/public/*` GET responses (defined in `security_middleware.py`)
+- **Bot-detection bypass**: `/api/invite`, `/api/public`, `/api/uploads`, `/api/ws`, `/api/rsvp`, `/api/payments/razorpay-webhook` are whitelisted so viral invitations are never soft-blocked
 
-## What's been implemented (Jan 15, 2026)
+## What's been implemented & verified (2026-05-16)
 
-### Session 2026-05-15 — PROMPTS 05+13, 07, 16 (E1 continuation)
+### Backend module — `monetization_features.py` (443 lines)
+9 endpoints, all 100% pass on 14/14 pytest regression:
 
-**Prompt 05 + 13 — Live Photo Gallery + Guest Upload**
-- New backend module `/app/backend/live_gallery_features.py` registered at `/api/...`
-- WebSocket: `wss://<host>/api/ws/gallery/{wedding_id_or_slug}` — ConnectionManager pattern,
-  broadcasts `{type:photo_added|photo_deleted, ...}` on every upload/delete.
-- Endpoints: `POST /api/admin/profiles/{id}/live-gallery/upload` (multipart, multiple files,
-  generates 800px WebP thumb + 200px micro via Pillow), `POST /api/invite/{slug}/gallery/guest-upload`
-  (auto-publishes), `GET /api/public/gallery/{slug}/photos`, `GET /api/admin/profiles/{id}/live-gallery/photos`,
-  `DELETE /api/admin/profiles/{id}/live-gallery/{photo_id}`, `GET /api/uploads/weddings/{wedding_id}/{folder}/{filename}`.
-- MongoDB collection `live_gallery_photos` { id, profile_id, wedding_id, url, thumb_url, micro_url, source, guest_name, caption, width, height, file_size, created_at }
-- Frontend: rewrote `src/components/luxury/LivePhotoWallTeaser.jsx` (native WebSocket with 3s
-  reconnect, CSS-columns masonry, animated spring-in for new photos, full-screen lightbox with
-  arrow nav). New `src/components/luxury/GuestUploadButton.jsx` (floating gold pill bottom-right,
-  modal with name + file picker + caption + success animation). Mounted in `LuxuryPublicInvitation.jsx`
-  after cinematic opening. New management page `src/pages/LiveGalleryManagement.jsx` (drag-drop
-  via react-dropzone + concurrent uploads + progress bars + stats tiles + delete).
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /api/super-admin/credit-packs` | super-admin | List all packs |
+| `POST /api/super-admin/credit-packs` | super-admin | Create pack |
+| `PUT /api/super-admin/credit-packs/{id}` | super-admin | Update pack |
+| `DELETE /api/super-admin/credit-packs/{id}` | super-admin | Delete pack |
+| `GET /api/admin/credit-packs` | photographer | List active packs |
+| `POST /api/admin/credits/purchase/create-order` | photographer | Razorpay order |
+| `POST /api/admin/credits/purchase/verify` | photographer | Signature verify → atomic credit add |
+| `POST /api/payments/razorpay-webhook` | public+HMAC | Idempotent fallback |
+| `GET /api/admin/credits/purchases` | photographer | Purchase history |
+| `GET /api/super-admin/photographers/{id}/detail` | super-admin | Pin-to-pin drill-down |
 
-**Prompt 07 — Wishes Wall + Moderation + Featured**
-- New backend module `/app/backend/wishes_features.py`. Endpoints: `POST /api/invite/{slug}/wishes`
-  (public, rate-limit 3/IP/wedding/day via `wish_rate_limits`), `GET /api/public/invite/{slug}/wishes`
-  (approved only, featured first), `GET /api/admin/profiles/{id}/wishes?status=`, approve / reject /
-  feature (max 3 featured, auto-rotate oldest, auto-approves) / bulk-approve / delete.
-- Frontend: new `src/components/luxury/WishesWallSection.jsx` (replaces old inline guest book on
-  public invitation) — 3 burgundy `#4A0E2A` spotlight cards for featured wishes (gold-bordered with
-  sparkle badge), CSS-columns masonry for approved wishes, "Leave a Wish" gold CTA opens modal.
-  Rewrote `src/pages/WishesManagement.jsx` (luxury hero, Pending/Approved/Rejected tabs with red
-  badge on pending count, action buttons per wish, "Approve All Pending" bulk).
+### Frontend pages (3 new + 3 wired buttons)
+1. `/app/frontend/src/pages/CreditPacksAdmin.jsx` — super-admin CRUD UI (3 packs seeded as Starter/Studio/Atelier)
+2. `/app/frontend/src/pages/PhotographerDetail.jsx` — drill-down with admin info + 6 stat tiles + Invitations/Credit Ledger/Purchases tabs
+3. `/app/frontend/src/pages/CreditsTopUp.jsx` — photographer Razorpay Checkout with PAY ₹500/1000/2500 buttons + balance card
 
-**Prompt 16 — Analytics deep-dive**
-- New backend module `/app/backend/analytics_extras.py`. Endpoints: heatmap (90 days), funnel
-  (4 stages), geography (top 10 cities), `POST /api/admin/profiles/{id}/analytics/ai-insights`
-  (Claude Sonnet 4.5 via Emergent LLM key, 24h cache in `ai_insights_cache`).
-- Frontend: new `src/components/luxury/AnalyticsExtrasSection.jsx` mounted at top of
-  `Phase30AnalyticsPage.jsx` — AI Insights gold-bordered card with 3 bullet insights + shimmer
-  skeleton + "Refresh" button, D3.js calendar heatmap (90 days, tooltip hover), custom-SVG
-  RSVP funnel (animated Framer Motion bars + drop-off %), recharts horizontal BarChart for
-  top 10 cities, "Export PDF Report" using jspdf + jspdf-autotable. Also wrapped legacy
-  analytics error state to still render the new section.
+**Wired buttons:**
+- `LuxurySuperAdminDashboard.jsx` line 148: `credit-packs-btn` → `/super-admin/credit-packs`
+- `LuxurySuperAdminDashboard.jsx` line 201: `view-detail-<id>` → `/super-admin/photographers/<id>`
+- `LuxuryDashboard.jsx` line 266: `dashboard-top-up` → `/admin/credits/top-up`
 
-**Verified by testing subagent**: 23/23 backend tests pass (5 NoRegression + 7 LiveGallery + 8 Wishes + 3 Analytics + AI insights cache hit). No critical issues. All endpoints respond correctly via curl + browser.
+### Atomic credit-add (idempotent)
+`monetization_features.py:_credit_purchase_atomic` uses `update_one({credited:{$ne:true}})` → modified_count check → `credit_service.add_credits(…)` with rollback on failure. Webhook + verify both call the same primitive so double-credit is impossible.
 
-
-- `src/styles/luxury-overrides.css` — global overrides for shadcn `bg-card`, gray/white surfaces, brand
-  rose→gold, status colors, tables, inputs, headings, button gradients.
-- `src/index.js` imports both `luxury.css` + `luxury-overrides.css` globally.
-- `src/App.js` sets `body.luxe luxe-grain luxe-vignette` globally.
-
-**Pages fully redesigned with hero treatments (matching master prompts)**
-1. `LandingPage.jsx` — Prompt 01 (already done · cinematic hero, mandala 3D, 10 master themes)
-2. `RSVPManagement.jsx` — Prompt 06 (luxury hero, gradient stat tiles, glass table, micro-animations)
-3. `PostWeddingManagement.jsx` — Prompt 15 (Memory Archive · burgundy hero, nostalgic gradient)
-4. `ReferralsCreditsPage.jsx` — Prompt 20 (Credits & Monetization · plan showcase + glass tabs)
-5. `DesignSelector.jsx` — Prompt 11 partial (8 cinematic worlds in glass cards)
-6. `Phase30AnalyticsPage.jsx` — Prompt 16 partial (header luxury · charts use gold palette)
-7. `QRCodeManagement.jsx` — luxury hero + orbits
-
-**Pages auto-transformed via global luxe wrapper (CSS overrides handle styling)**
-8. `AdminDashboard.jsx` (legacy fallback)
-9. `AnalyticsPage.jsx` (legacy fallback)
-10. `AuditLogsPage.jsx`
-11. `GreetingsManagement.jsx`
-12. `WishesManagement.jsx`
-13. `ThemeSettingsPage.jsx`
-14. `WeddingDashboard.jsx`
-15. `WeddingsDashboard.jsx`
-16. `WeddingEditor.jsx`
-17. `ProfileForm.jsx` (legacy)
-18. `SuperAdminDashboard.jsx` (legacy fallback)
-19. `InvitationViewer.jsx`
-20. `PublicInvitation.jsx` (legacy)
-
-**Result**: All 20 spec prompts now share consistent Royal-Heritage luxury aesthetic.
+### Scaling (preventive)
+- `security_middleware.py:62-73` — Cache-Control on origin (verified via curl at localhost:8001)
+- `security_middleware.py:189-197` — Bot-detection whitelist verified: `curl/8.0.1` UA passes through `/api/invite/*`
 
 ## Default seeded users
-- Photographer: `admin@wedding.com` / `admin123`
-- Super Admin: `superadmin@wedding.com` / `SuperAdmin@123`
+- **Photographer**: `admin@wedding.com` / `admin123`
+- **Super Admin**: `superadmin@wedding.com` / `SuperAdmin@123`
 
-## Verified flows
-- Landing page renders 3D mandala + 10 theme grid.
-- Admin login → luxury dashboard with stat tiles.
-- Super Admin login → "Sovereign command" dashboard.
-- Couple portal (`/couple/access`) cinematic.
-- Audit Logs, Themes Showroom, Luxury Preview all show dark cinematic surfaces.
+## Default seeded credit packs
+- Starter — ₹500 = 50 credits
+- Studio — ₹1,000 = 120 credits (`badge: Most Popular`)
+- Atelier — ₹2,500 = 350 credits
 
-## Known issues / Notes
-- bcrypt `__about__` warning from passlib is harmless (auth works).
-- Legacy `/invite-legacy/:slug` and `/admin/dashboard-legacy` routes intentionally kept for
-  fallback compatibility.
+## Razorpay Test Configuration
+- `RAZORPAY_KEY_ID=rzp_test_Spuhaq4p1yWumY`
+- `RAZORPAY_KEY_SECRET=vIMPwLwrHItJQmj1wFvD233u`
+- `RAZORPAY_WEBHOOK_SECRET=PLACEHOLDER_WEBHOOK_SECRET` (replace before live deploy → enables HMAC verification)
+- Test card: `4111 1111 1111 1111`, any CVV, any future expiry, OTP `1221`
 
-## Prioritised backlog
-- P1: Full Prompt 02 cinematic 3D wax-seal opening (currently 2D approximation in LuxuryPreview).
-- P1: Prompt 05 Live Photo Gallery realtime updates polish (Supabase Realtime / WS).
-- P2: Prompt 12 Digital Shagun payment integration UI (Razorpay UI exists, payment flow placeholder).
-- P2: Prompt 08 ambient adaptive music system per section crossfades (Howler.js wiring).
-- P3: Mobile reductions for Three.js scenes on low-end GPUs.
+## Verified test results (iteration_8)
+- **Backend**: 14/14 pytest tests pass (`/app/backend/tests/test_iteration8_monetization.py`)
+- **Frontend**: 4/4 flows pass — SA login+dashboard, SA credit-packs page, SA photographer-detail page, photographer top-up page
+- No critical bugs. Minor cosmetic notes only (label casing).
 
-## Next tasks
-- Wire up real wedding data to test full PublicInvitation cinematic experience end-to-end.
-- Add testing agent regression for RSVP submission, credit flows.
+## Action items / Backlog
+- **(Infra)** Configure ingress/CDN to honor origin Cache-Control on `/api/public/*` and `/api/uploads/*` (currently CDN overrides with `no-store` on the public preview URL — works correctly on origin)
+- **(P2)** Per-admin rate-limit on `/api/admin/credits/purchase/create-order` (currently a stolen token can spawn unlimited Razorpay orders)
+- **(P2)** Webhook handler returns 200 even when credit-add fails — should return 500 to let Razorpay retry
+- **(P3)** `photographer_detail` does N+1 count_documents per profile — switch to `$facet` aggregation when a photographer's profile count exceeds ~50
+- **(P3)** Revenue sums first 100 purchases only — move to server-side aggregation for >100 purchases
+- **(P2)** Set real `RAZORPAY_WEBHOOK_SECRET` before going live so HMAC verification is enforced
+
+## Next session — pickup points
+1. Test a full end-to-end Razorpay payment (requires human OTP entry — `1221` for test cards)
+2. Add an audit log entry when super-admin creates/deletes a credit pack (currently only the pack doc records `created_by`)
+3. Consider adding a "Plans & Pricing" tab on the super-admin dashboard that surfaces total revenue across all photographers, top spenders, MoM growth
 
 ## Last updated
-Jan 15, 2026
+2026-05-16 — Session 2 — Monetization regression complete (was in-progress in previous session, now 100% green).
