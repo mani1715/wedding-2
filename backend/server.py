@@ -1013,9 +1013,23 @@ async def get_all_profiles(admin_data: dict = Depends(require_admin)):
 
 
 @api_router.post("/admin/profiles", response_model=ProfileResponse)
-async def create_profile(profile_data: ProfileCreate, admin_data: dict = Depends(require_admin)):
-    """Create new profile - PHASE 35: Auto-assign admin_id"""
+async def create_profile(
+    profile_data: ProfileCreate,
+    on_behalf_of: Optional[str] = None,
+    admin_data: dict = Depends(require_admin),
+):
+    """Create new profile - PHASE 35: Auto-assign admin_id.
+    Super-admins may pass ?on_behalf_of=<photographer_admin_id> to create
+    an invitation under that photographer's account.
+    """
     admin_id = admin_data['admin_id']
+
+    # Super-admin impersonation: create under a specific photographer
+    if on_behalf_of and admin_data.get('role') == 'super_admin':
+        target = await db.admins.find_one({"id": on_behalf_of, "role": "admin"}, {"_id": 0, "id": 1})
+        if not target:
+            raise HTTPException(status_code=404, detail="Photographer not found")
+        admin_id = on_behalf_of
     
     # Generate unique slug
     slug = generate_slug(profile_data.groom_name, profile_data.bride_name)

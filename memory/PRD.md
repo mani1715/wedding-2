@@ -57,6 +57,13 @@ User cloned `https://github.com/mani1715/wedding-2`. Previous E1 session impleme
 - **Photographer**: `admin@wedding.com` / `admin123`
 - **Super Admin**: `superadmin@wedding.com` / `SuperAdmin@123`
 
+## Demo Invitation (seeded for showcase)
+- **Slug**: `aarav-and-riya-demo`
+- **Public link**: `/invite/aarav-and-riya-demo`
+- **Owner**: admin@wedding.com (Demo Photographer)
+- **Includes**: 6 royal-wedding photos in live gallery, 5 RSVPs (3 yes / 1 maybe / 1 no), 5 wishes (3 featured), 142 views / 97 unique
+- **Re-seed**: `cd /app/backend && python seed_demo_invitation.py` (idempotent)
+
 ## Default seeded credit packs
 - Starter — ₹500 = 50 credits
 - Studio — ₹1,000 = 120 credits (`badge: Most Popular`)
@@ -87,4 +94,4 @@ User cloned `https://github.com/mani1715/wedding-2`. Previous E1 session impleme
 3. Consider adding a "Plans & Pricing" tab on the super-admin dashboard that surfaces total revenue across all photographers, top spenders, MoM growth
 
 ## Last updated
-2026-05-16 — Session 2 — Monetization regression complete (was in-progress in previous session, now 100% green).
+2026-05-16 — Session 3 — Added: Super-admin "Create Invitation" UI flow + on-behalf-of backend support, fixed password-mismatch bug in Create Photographer modal, fixed pre-existing auth-race redirect on dashboards, seeded full demo invitation with 6 photos / 5 RSVPs / 5 wishes / 142 views.

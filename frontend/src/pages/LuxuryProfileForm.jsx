@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import {
@@ -52,8 +52,10 @@ const DEFAULT_FORM = {
 const LuxuryProfileForm = () => {
   const navigate = useNavigate();
   const { profileId, weddingId } = useParams();
+  const [searchParams] = useSearchParams();
+  const onBehalfOf = searchParams.get('on_behalf_of'); // super-admin impersonation
   const id = profileId || weddingId || null;
-  const { admin } = useAuth();
+  const { admin, loading: authLoading } = useAuth();
   const isNew = !id;
 
   const [step, setStep] = useState(0);
@@ -66,10 +68,11 @@ const LuxuryProfileForm = () => {
   const [shareLink, setShareLink] = useState('');
 
   useEffect(() => {
+    if (authLoading) return; // wait for auth to hydrate
     if (!admin) { navigate('/admin/login'); return; }
     if (!isNew) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [admin, authLoading]);
 
   const load = async () => {
     try {
@@ -132,7 +135,10 @@ const LuxuryProfileForm = () => {
       };
       let res;
       if (isNew) {
-        res = await axios.post(`${API_URL}/api/admin/profiles`, body);
+        const createUrl = onBehalfOf
+          ? `${API_URL}/api/admin/profiles?on_behalf_of=${encodeURIComponent(onBehalfOf)}`
+          : `${API_URL}/api/admin/profiles`;
+        res = await axios.post(createUrl, body);
       } else {
         res = await axios.put(`${API_URL}/api/admin/profiles/${id}`, body);
       }
@@ -144,7 +150,10 @@ const LuxuryProfileForm = () => {
           setShareLink(pubRes.data.share_link || res.data.share_link || '');
         } catch (_) { setPublished(true); }
       }
-      if (isNew && res.data.id) navigate(`/admin/profile/${res.data.id}/edit`, { replace: true });
+      if (isNew && res.data.id) {
+        const suffix = onBehalfOf ? `?on_behalf_of=${encodeURIComponent(onBehalfOf)}` : '';
+        navigate(`/admin/profile/${res.data.id}/edit${suffix}`, { replace: true });
+      }
       return res.data;
     } catch (e) {
       const detail = e.response?.data?.detail;
@@ -170,10 +179,10 @@ const LuxuryProfileForm = () => {
 
   return (
     <LuxuryShell
-      eyebrow="◆ Wedding Editor"
+      eyebrow={onBehalfOf ? '◆ Wedding Editor · On behalf of photographer' : '◆ Wedding Editor'}
       title={isNew ? 'New Wedding' : `${form.bride_name} & ${form.groom_name}`}
       showBack
-      onBack={() => navigate('/admin/dashboard')}
+      onBack={() => navigate(onBehalfOf ? `/super-admin/photographers/${onBehalfOf}` : '/admin/dashboard')}
       actions={
         <button onClick={() => save()} disabled={saving} className="lux-btn lux-btn-ghost text-xs" data-testid="save-btn">
           {saving ? <Sparkles className="w-3.5 h-3.5 animate-pulse" /> : <Save className="w-3.5 h-3.5" />}
@@ -183,7 +192,20 @@ const LuxuryProfileForm = () => {
       testid="luxury-profile-form"
     >
       <div className="px-6 md:px-10 py-10 max-w-5xl mx-auto">
-        {/* Stepper */}
+        {onBehalfOf && (
+          <div className="mb-6 px-5 py-4 rounded-xl flex items-start gap-3 text-sm"
+            style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.35)', color: '#FFF8DC' }}
+            data-testid="on-behalf-banner"
+          >
+            <Sparkles className="w-4 h-4 mt-0.5 text-gold shrink-0" />
+            <div>
+              <div className="font-medium" style={{ color: '#D4AF37' }}>Creating invitation on behalf of a photographer</div>
+              <div className="text-xs mt-1" style={{ color: 'rgba(255,248,220,0.7)' }}>
+                This invitation will be saved under photographer ID <span className="font-mono">{onBehalfOf.slice(0, 8)}…</span> and appear in their dashboard.
+              </div>
+            </div>
+          </div>
+        )}        {/* Stepper */}
         <div className="lux-glass p-4 mb-8 overflow-x-auto">
           <div className="flex items-center gap-2 min-w-max">
             {STEPS.map((s, i) => {

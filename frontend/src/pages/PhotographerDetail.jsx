@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import axios from 'axios';
 import {
   ArrowLeft, ExternalLink, Calendar, MapPin, Users, Eye, Heart, Camera,
-  IndianRupee, Coins, CheckCircle2, XCircle, Clock, Loader2, Sparkles,
+  IndianRupee, Coins, CheckCircle2, XCircle, Clock, Loader2, Sparkles, FilePlus2,
 } from 'lucide-react';
 import '@/styles/luxury.css';
 
@@ -62,19 +62,29 @@ const PhotographerDetail = () => {
         </button>
 
         {/* Hero */}
-        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="mb-10">
-          <span className="lux-eyebrow block mb-3">◆ Photographer · Pin-to-pin details</span>
-          <h1 className="font-display text-[2.2rem] md:text-[3.6rem] leading-[1.05]" style={{ color: '#FFF8DC' }}>
-            {admin.name || admin.email.split('@')[0]} <span className="font-script italic text-gold">studio</span>
-          </h1>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm" style={{ color: 'rgba(255,248,220,0.6)' }}>
-            <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-gold" /> {admin.email}</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-gold" /> Role: {admin.role}</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-gold" /> Status: {admin.status || 'active'}</span>
-            {summary.last_login && (
-              <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-gold" /> Last seen {new Date(summary.last_login).toLocaleString('en-IN')}</span>
-            )}
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="mb-10 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span className="lux-eyebrow block mb-3">◆ Photographer · Pin-to-pin details</span>
+            <h1 className="font-display text-[2.2rem] md:text-[3.6rem] leading-[1.05]" style={{ color: '#FFF8DC' }}>
+              {admin.name || admin.email.split('@')[0]} <span className="font-script italic text-gold">studio</span>
+            </h1>
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm" style={{ color: 'rgba(255,248,220,0.6)' }}>
+              <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-gold" /> {admin.email}</span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-gold" /> Role: {admin.role}</span>
+              <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-gold" /> Status: {admin.status || 'active'}</span>
+              {summary.last_login && (
+                <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-gold" /> Last seen {new Date(summary.last_login).toLocaleString('en-IN')}</span>
+              )}
+            </div>
           </div>
+          <button
+            onClick={() => navigate(`/admin/profile/new?on_behalf_of=${adminId}`)}
+            className="lux-btn inline-flex items-center gap-2"
+            data-testid="pd-create-invitation"
+            title="Create a new invitation under this photographer's account"
+          >
+            <FilePlus2 className="w-4 h-4" /> Create invitation
+          </button>
         </motion.div>
 
         {/* Stat tiles */}

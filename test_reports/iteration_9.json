@@ -1,0 +1,46 @@
+{
+  "summary": "Session 3 fixes regression — all 10/10 backend pytest pass and all 8 frontend flows pass. Backend: short password (6 chars) on POST /api/super-admin/admins → 422 with 'password' in message; valid 8+ char password → 201 with email echoed (no password leakage); SA POST /api/admin/profiles?on_behalf_of=<demo_ph_id> creates the profile under the photographer (verified by listing as photographer); photographer trying on_behalf_of of another id is silently downgraded to own admin_id (no privilege escalation); SA on_behalf_of=fake-id → 404 Photographer not found; GET /api/admin/profiles (photographer token) returns the Aarav & Riya demo (slug=aarav-and-riya-demo, groom=Aarav, bride=Riya); SA detail returns summary.rsvps_total=5, summary.views_total=142, and demo profile metrics views=142/rsvps=5/wishes=5/photos=6; /api/public/gallery/<slug>/photos returns exactly 6 photos; /api/invite/<slug> returns groom=Aarav, bride=Riya, venue contains 'Leela'; Cache-Control header at the FastAPI layer = 'public, max-age=30, s-maxage=60'. Frontend: SA /super-admin/login → /super-admin/dashboard (no redirect-loop on reload — authLoading guard works); action bar shows create-admin-btn + sa-create-invitation-btn + credit-packs-btn; CreateAdminModal opens with all 4 fields and password minLength=8; submitting Goodpass1 closes the modal and new row appears in admins-list; sa-create-invitation-btn navigates to /admin/profile/new?as=super-admin; /super-admin/photographers/<id> renders Demo Photographer header + pd-create-invitation button + views=142 tile + Aarav&Riya card; clicking pd-create-invitation navigates to /admin/profile/new?on_behalf_of=<id> AND the gold on-behalf-banner is rendered ('Creating invitation on behalf of a photographer'); public /invite/<slug> loads the luxury wax-seal monogram with 'R & A' (no errors, no crash).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/admin/profiles",
+        "issue": "ProfileResponse does not expose admin_id — clients/tests cannot directly verify ownership after creation. Workaround: verify via /api/admin/profiles list under the target photographer's token. Consider adding admin_id to ProfileResponse (or returning it only for super_admin callers) for clearer API contract."
+      },
+      {
+        "endpoint": "GET /api/super-admin/photographers/<id>/detail",
+        "issue": "summary.profiles_total counts ALL profiles including drafts; spec hint says '1' but seeded photographer also accumulated test-created drafts during this run (TEST_ prefixed). Demo metrics (views=142, rsvps=5, wishes=5, photos=6 on the Aarav&Riya card) are still correct because they're per-profile."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration9_session3_fixes.py",
+    "/app/test_reports/pytest/iteration9.xml"
+  ],
+  "action_items": [
+    "(Test hygiene) The test suite left a few TEST_ prefixed profiles on the demo photographer because DELETE /api/admin/profiles/<id> isn't called in cleanup (status unknown — may not exist). If a cleanup endpoint exists, wire it into the test teardown so future SA detail counts remain pristine.",
+    "(API contract) Consider adding admin_id to ProfileResponse for super_admin role so on_behalf_of correctness can be asserted directly without a second list call."
+  ],
+  "critical_code_review_comments": [
+    "server.py:1015-1032 — on_behalf_of impersonation check is correctly gated by admin_data.get('role') == 'super_admin'; photographer tokens are silently downgraded to own admin_id (good — prevents privilege escalation while staying non-breaking).",
+    "server.py:1029 — find_one query correctly filters {'id': on_behalf_of, 'role': 'admin'} so a super_admin can't accidentally hand off to another super_admin or a deleted admin.",
+    "LuxurySuperAdminDashboard.jsx — authLoading guard prevents the AuthContext race that previously redirected to /super-admin/login on hard reload. Verified by browser reload test.",
+    "Password validation surfaces a 422 with field-level detail — UI can map it to a friendly error. Confirmed via direct API call with password='short'.",
+    "Cache-Control header is set at the FastAPI middleware layer for /api/invite/* — verified at localhost:8001 (public preview URL still has CDN override risk; previously documented in iteration_8)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration9_session3_fixes.py (NEW — 10 tests, all green)",
+    "/app/test_reports/pytest/iteration9.xml (NEW — JUnit XML)"
+  ],
+  "success_rate": {"backend": "100% (10/10 pytest)", "frontend": "100% (8/8 flows)"},
+  "test_credentials": "Super admin: superadmin@wedding.com / SuperAdmin@123 ; Photographer: admin@wedding.com / admin123 ; Demo photographer id: 604db096-c1ca-4738-8663-7e640334a6ac ; Demo invitation slug: aarav-and-riya-demo. UA header 'Mozilla/5.0' required on /api/admin/* and /api/super-admin/* — bot-detection middleware blocks python-requests default UA.",
+  "seed_data_creation": "Test created 1 photographer admin (TEST_ok_<rand>@example.com, password Goodpass1) and 2 profiles via on_behalf_of flow. Photographer admin was deleted via DELETE /api/super-admin/admins/<id>. Profile cleanup (DELETE /api/admin/profiles/<id>) was attempted but endpoint may not exist — minor residue of TEST_ profiles on the demo photographer (visible in SA detail tab Invitations(5)). Demo invitation aarav-and-riya-demo is intact and NOT modified.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "1) Use POST /api/admin/profiles with REQUIRED fields: groom_name, bride_name, venue, event_date, event_type (string e.g. 'wedding'), events (can be []). Missing event_type → 422. 2) ProfileResponse does NOT include admin_id — to verify on_behalf_of correctness, login as the target photographer and list /api/admin/profiles, check the new id is there. 3) authLoading guard added to LuxurySuperAdminDashboard, LuxuryDashboard, LuxuryProfileForm — hard reload tests work now without redirect-loop. 4) The on-behalf-banner is implemented and rendered when ?on_behalf_of=<id> is present in the URL on /admin/profile/new (super_admin role only). 5) Demo data: views=142, rsvps=5, wishes=5, photos=6, slug='aarav-and-riya-demo' — DO NOT delete or modify. 6) iteration_9.json now corresponds to this run (previous numbering 1-8 already used)."
+}

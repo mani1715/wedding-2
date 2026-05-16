@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import axios from 'axios';
 import {
   Users, UserPlus, Wallet, ShieldCheck, ShieldOff, Plus, Minus,
-  Search, TrendingUp, FileText, Crown, X, Check, Eye, Coins,
+  Search, TrendingUp, FileText, Crown, X, Check, Eye, Coins, FilePlus2,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -21,7 +21,7 @@ const fadeUp = {
 
 const LuxurySuperAdminDashboard = () => {
   const navigate = useNavigate();
-  const { admin } = useAuth();
+  const { admin, loading: authLoading } = useAuth();
   const [tab, setTab] = useState('admins');
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,12 +33,13 @@ const LuxurySuperAdminDashboard = () => {
   const [auditLogs, setAuditLogs] = useState([]);
 
   useEffect(() => {
+    if (authLoading) return; // wait for auth to hydrate from localStorage
     if (!admin) { navigate('/super-admin/login'); return; }
     if (admin.role !== 'super_admin' && admin.role !== 'SUPER_ADMIN') { navigate('/admin/dashboard'); return; }
     fetchAdmins();
     fetchAuditLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [admin]);
+  }, [admin, authLoading]);
 
   const fetchAdmins = async () => {
     try {
@@ -144,6 +145,9 @@ const LuxurySuperAdminDashboard = () => {
             <div className="flex flex-wrap gap-2">
               <button onClick={() => setShowCreate(true)} className="lux-btn" data-testid="create-admin-btn">
                 <UserPlus className="w-4 h-4" /> Create Photographer
+              </button>
+              <button onClick={() => navigate('/admin/profile/new?as=super-admin')} className="lux-btn lux-btn-ghost" data-testid="sa-create-invitation-btn">
+                <FilePlus2 className="w-4 h-4" /> Create Invitation
               </button>
               <button onClick={() => navigate('/super-admin/credit-packs')} className="lux-btn lux-btn-ghost" data-testid="credit-packs-btn">
                 <Coins className="w-4 h-4" /> Credit Packs
@@ -335,26 +339,46 @@ const CreateAdminModal = ({ onClose, onCreated }) => {
   const [form, setForm] = useState({ email: '', password: '', name: '', initial_credits: 50 });
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
 
+  // Friendly error formatter — converts pydantic validation arrays into readable lines
+  const friendlyError = (detail) => {
+    if (!detail) return 'Failed to create photographer';
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail.map((d) => {
+        const field = (d.loc || []).slice(-1)[0] || 'field';
+        return `${field}: ${d.msg || 'invalid'}`;
+      }).join(' · ');
+    }
+    return JSON.stringify(detail);
+  };
+
   const submit = async (e) => {
     e.preventDefault(); setErr(''); setBusy(true);
+    if ((form.password || '').length < 8) {
+      setErr('Password must be at least 8 characters long');
+      setBusy(false);
+      return;
+    }
     try {
       await axios.post(`${API_URL}/api/super-admin/admins`, {
         email: form.email, password: form.password, name: form.name,
         initial_credits: parseInt(form.initial_credits, 10) || 0,
       });
       onCreated();
-    } catch (e) { setErr(e.response?.data?.detail || 'Failed to create admin'); }
+    } catch (ex) { setErr(friendlyError(ex.response?.data?.detail)); }
     finally { setBusy(false); }
   };
 
   return (
     <ModalShell title="Create Photographer" eyebrow="New Studio" onClose={onClose} testid="create-admin-modal">
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Studio Name"><input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={inputStyle} data-testid="new-admin-name" /></Field>
-        <Field label="Email"><input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={inputStyle} data-testid="new-admin-email" /></Field>
-        <Field label="Password"><input type="password" required minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} style={inputStyle} data-testid="new-admin-password" /></Field>
+        <Field label="Studio Name"><input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={inputStyle} placeholder="Mani's Studio" data-testid="new-admin-name" /></Field>
+        <Field label="Email"><input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={inputStyle} placeholder="studio@example.com" data-testid="new-admin-email" /></Field>
+        <Field label="Password (min 8 characters)"><input type="password" required minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} style={inputStyle} placeholder="At least 8 characters" data-testid="new-admin-password" /></Field>
         <Field label="Initial Credits"><input type="number" min={0} required value={form.initial_credits} onChange={(e) => setForm({ ...form, initial_credits: e.target.value })} style={inputStyle} data-testid="new-admin-credits" /></Field>
-        {err && <div className="text-sm px-3 py-2 rounded-md" style={{ background: 'rgba(139,0,0,0.18)', color: '#FFD7C9' }}>{err}</div>}
+        {err && <div className="text-sm px-3 py-2.5 rounded-md flex items-start gap-2" style={{ background: 'rgba(139,0,0,0.18)', color: '#FFD7C9', border: '1px solid rgba(139,0,0,0.4)' }} data-testid="create-admin-error">
+          <X className="w-4 h-4 shrink-0 mt-0.5" /> {err}
+        </div>}
         <button type="submit" disabled={busy} className="lux-btn w-full justify-center" data-testid="submit-create-admin">
           {busy ? 'Creating…' : 'Create Studio'} <Crown className="w-4 h-4" />
         </button>

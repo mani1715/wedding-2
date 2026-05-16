@@ -22,7 +22,7 @@ const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.05 } }
 
 const LuxuryDashboard = () => {
   const navigate = useNavigate();
-  const { admin, logout } = useAuth();
+  const { admin, logout, loading: authLoading } = useAuth();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -34,11 +34,12 @@ const LuxuryDashboard = () => {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return; // wait for auth context to hydrate
     if (!admin) { navigate('/admin/login'); return; }
     if (admin.role === 'super_admin') { navigate('/super-admin/dashboard'); return; }
     fetchProfiles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [admin]);
+  }, [admin, authLoading]);
 
   const fetchProfiles = async () => {
     try {
