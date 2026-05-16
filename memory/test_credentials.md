@@ -1,41 +1,57 @@
 # Test Credentials
 
-## Photographer Admin
+## Photographer Admin (Studio)
 - Email: `admin@wedding.com`
 - Password: `admin123`
+- Endpoint: `POST /api/auth/login`
+- Dashboard: `/admin/dashboard`
+- Credits Top-up: `/admin/credits/top-up`
 
-## Super Admin
+## Super Admin (Platform Owner)
 - Email: `superadmin@wedding.com`
 - Password: `SuperAdmin@123`
+- Endpoint: `POST /api/auth/login` (same endpoint, role differs)
+- Dashboard: `/super-admin/dashboard`
+- Credit Packs Admin: `/super-admin/credit-packs`
+- Photographer Detail: `/super-admin/photographers/:adminId`
 
-## Test Profile
-- Slug: `aarav-riya-lp2bq2`
-- Profile ID: `122ffd50-a1d0-4583-b2af-43bea70bc815`
-- Public invitation URL: `/invite/aarav-riya-lp2bq2`
+## Razorpay Test Credentials (in `/app/backend/.env`)
+- RAZORPAY_KEY_ID = `rzp_test_Spuhaq4p1yWumY`
+- RAZORPAY_KEY_SECRET = `vIMPwLwrHItJQmj1wFvD233u`
+- RAZORPAY_WEBHOOK_SECRET = `PLACEHOLDER_WEBHOOK_SECRET` (set real value when deploying)
 
-## Test endpoints to verify (Prompts 05+13, 07, 16)
+## Test Razorpay Card (for sandbox checkout)
+- Card: `4111 1111 1111 1111`
+- CVV: any 3 digits
+- Expiry: any future date
+- OTP: `1221`
 
-### Prompt 05 + 13 — Live Photo Gallery
-- WebSocket: `wss://<host>/api/ws/gallery/{wedding_id_or_slug}` — connects with `{type:"connected", wedding_id:"..."}`
-- POST `/api/admin/profiles/{id}/live-gallery/upload` — multipart files; needs Bearer admin
-- POST `/api/invite/{slug}/gallery/guest-upload` — multipart: file, guest_name, caption; public
-- GET `/api/public/gallery/{slug}/photos?limit=200&since={iso}` — public
-- GET `/api/admin/profiles/{id}/live-gallery/photos` — admin
-- DELETE `/api/admin/profiles/{id}/live-gallery/{photo_id}` — admin (broadcasts deletion)
-- GET `/api/uploads/weddings/{wedding_id}/{folder}/{filename}` — serves files
+## Seeded Credit Packs (auto-created during this run)
+- Starter — ₹500 = 50 credits
+- Studio — ₹1,000 = 120 credits (Most Popular badge)
+- Atelier — ₹2,500 = 350 credits
 
-### Prompt 07 — Wishes Wall + Moderation
-- POST `/api/invite/{slug}/wishes` — public; rate-limit 3/IP/wedding/day
-- GET `/api/public/invite/{slug}/wishes?limit=50` — approved only, featured first
-- GET `/api/admin/profiles/{id}/wishes?status=pending|approved|rejected` — admin
-- POST `/api/admin/profiles/{id}/wishes/{id}/approve` — admin
-- POST `/api/admin/profiles/{id}/wishes/{id}/reject` — admin
-- POST `/api/admin/profiles/{id}/wishes/{id}/feature` — toggle, max 3 featured (auto-rotate oldest)
-- POST `/api/admin/profiles/{id}/wishes/bulk-approve` — admin
-- DELETE `/api/admin/profiles/{id}/wishes/{id}` — admin
+## Monetization API Endpoints (NEW)
 
-### Prompt 16 — Analytics extras
-- GET `/api/admin/profiles/{id}/analytics/heatmap?days=90` — `{data:[{date, opens}]}`
-- GET `/api/admin/profiles/{id}/analytics/funnel` — `{stages:[4]}`
-- GET `/api/admin/profiles/{id}/analytics/geography` — `{cities:[top 10]}`
-- POST `/api/admin/profiles/{id}/analytics/ai-insights` — Claude Sonnet 4.5, cached 24h
+### Super Admin — Credit Packs CRUD
+- `GET    /api/super-admin/credit-packs`           — list all packs
+- `POST   /api/super-admin/credit-packs`           — create pack
+- `PUT    /api/super-admin/credit-packs/{pack_id}` — update pack
+- `DELETE /api/super-admin/credit-packs/{pack_id}` — delete pack
+
+### Super Admin — Photographer drill-down
+- `GET /api/super-admin/photographers/{admin_id}/detail`
+  Returns `{ admin, summary, profiles, credit_ledger, purchases }` — pin-to-pin everything.
+
+### Photographer — Buy credits (Razorpay)
+- `GET  /api/admin/credit-packs`                       — list active packs
+- `POST /api/admin/credits/purchase/create-order`      — body `{pack_id}` → returns `{order_id, amount_paise, razorpay_key_id, …}`
+- `POST /api/admin/credits/purchase/verify`            — body `{razorpay_order_id, razorpay_payment_id, razorpay_signature}` → atomic credit add
+- `GET  /api/admin/credits/purchases`                  — purchase history
+
+### Razorpay Webhook (auto-credit fallback)
+- `POST /api/payments/razorpay-webhook` — idempotent, signature-verified
+
+## Public Invite Caching (preventive scaling)
+- `Cache-Control: public, max-age=30, s-maxage=60` on all `/api/invite/*` and `/api/public/*` GET responses
+- Bot-detection middleware whitelists `/api/invite`, `/api/public`, `/api/uploads/`, `/api/ws/`, `/api/rsvp`, `/api/payments/razorpay-webhook`

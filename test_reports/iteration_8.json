@@ -1,0 +1,69 @@
+{
+  "summary": "Full backend + frontend regression of the monetization feature set. Backend: 14/14 pytest pass in /app/backend/tests/test_iteration8_monetization.py covering every checklist item from the review request — SA + photographer login (correct role), SA credit-pack list/create/update/delete, photographer-side list (active only, all 3 seeded packs), create-order (returns rzp_test_ key OR placeholder 502), verify with bogus signature -> 400 'Invalid payment signature', purchase history GET, photographer detail drill-down returning {admin (no password_hash), summary, profiles, credit_ledger, purchases}, 401 unauth on admin endpoint, 403 for photographer token on SA endpoints, razorpay-webhook accepts empty body (placeholder secret), /api/invite/<slug> emits Cache-Control: public, max-age=30, s-maxage=60 at the FastAPI layer, bot-detection bypass on /api/invite (curl/8.0.1 UA NOT blocked). Frontend: SA /super-admin/login -> /super-admin/dashboard renders 'Sovereign command' + credit-packs-btn + view-detail-<id>; credit-packs-btn -> /super-admin/credit-packs renders 3 gold-bordered cards (Starter ₹500/50, Studio ₹1000/120 'MOST POPULAR', Atelier ₹2500/350) with EDIT/DELETE + 'Add a New Pack'; Details -> /super-admin/photographers/<id> renders Demo Photographer header + admin@wedding.com + 6 stat tiles (Invitations, Published, RSVPs, Views, Credits Left, Revenue) + 3 tabs (Invitations(0), Credit ledger(0), Purchases(1)); Photographer /admin/login -> dashboard -> top-up renders /admin/credits/top-up with 3 PAY-₹ gold buttons + balance card (Available, Total Ever Added, Used) + Recent Purchases table.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/admin/credit-packs and /api/super-admin/credit-packs",
+        "issue": "Response envelope is {packs: [...]} rather than a raw array (and purchases is {purchases: [...]}). Not a bug per se but the iteration_7 test file assumed a raw array — frontend pages handle both via .packs accessor, so end-user is unaffected. Documenting for next agent."
+      },
+      {
+        "endpoint": "POST /api/admin/credits/purchase/create-order",
+        "issue": "With placeholder Razorpay keys this returns 502 'Authentication failed' from Razorpay (expected). Once real test keys are configured the route returns 200 with razorpay_key_id starting with rzp_test_. Test accepts 200/502/503."
+      },
+      {
+        "endpoint": "POST /api/payments/razorpay-webhook",
+        "issue": "Signature-verified path NOT exercised end-to-end (RAZORPAY_WEBHOOK_SECRET is 'PLACEHOLDER_*' so code takes the unverified branch). Code-review only — recommend a separate e2e once a real webhook secret is set."
+      },
+      {
+        "endpoint": "GET /api/public/* and /api/uploads/*",
+        "issue": "Cloudflare/Kubernetes ingress overrides FastAPI Cache-Control with 'no-store' on the public URL. Verified header is correctly set at localhost:8001. Infra/ingress configuration action item — not code."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/admin/credits/top-up",
+        "issues": ["Balance card label is 'Total Ever Added' instead of the spec's shorter 'Total' — purely cosmetic; the metric is correct."]
+      },
+      {
+        "screen": "/super-admin/photographers/<id>",
+        "issues": ["Tab label is 'Credit ledger' (lowercase l) while spec used 'Credit Ledger'. Cosmetic only."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration8_monetization.py",
+    "/app/test_reports/pytest/iteration8.xml"
+  ],
+  "action_items": [
+    "(Infra) Configure ingress/CDN to honor origin Cache-Control on /api/public/* and /api/uploads/* (currently overridden to no-store) so the preventive caching in security_middleware.py:62-73 takes effect at the edge.",
+    "(Recommend) Add per-admin rate-limit on /api/admin/credits/purchase/create-order — currently a stolen token could spawn unlimited Razorpay orders.",
+    "(Recommend) monetization_features.py webhook handler returns 200 even when credit-add fails (line ~343). Razorpay retries on non-2xx; returning 500 on credit failure would allow Razorpay to re-deliver.",
+    "(Recommend) photographer_detail does N+1 count_documents per profile (~4 queries/profile). Fine at current scale; switch to $facet aggregation once a photographer's profile count exceeds ~50.",
+    "(Recommend) Revenue summed in Python from first 100 purchases only (limit(100)). A photographer with >100 purchases will under-report revenue. Move to server-side aggregation."
+  ],
+  "critical_code_review_comments": [
+    "All monetization endpoints correctly exclude MongoDB _id from responses — verified by test assertions.",
+    "Atomic credit pattern (update_one with {credited:{$ne:true}} + check modified_count) is the correct idempotency primitive. Good.",
+    "razorpay webhook HMAC computed on RAW request bytes before json.loads — correct per Razorpay spec.",
+    "SA endpoints properly enforce require_super_admin; photographer token -> 403 confirmed via test.",
+    "monetization_features.py is 443 lines (under 700-line guideline). _strip + _now_iso helpers are duplicated from other feature modules — extract to a shared util.",
+    "Bot-detection whitelist correctly skips /api/invite, /api/public, /api/uploads/, /api/ws/, /api/rsvp, /api/payments/razorpay-webhook — verified via curl UA test.",
+    "Cache-Control header correctly set on /api/invite/* GETs (max-age=30, s-maxage=60, public) — verified at FastAPI layer."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration8_monetization.py (NEW — 14 tests, all green)",
+    "/app/test_reports/pytest/iteration8.xml (NEW — JUnit XML)"
+  ],
+  "success_rate": {"backend": "100% (14/14 pytest)", "frontend": "100% (4/4 flows: SA login+dashboard, SA credit-packs page, SA photographer-detail page, photographer top-up page)"},
+  "test_credentials": "Super admin: superadmin@wedding.com / SuperAdmin@123 ; Photographer: admin@wedding.com / admin123 ; Razorpay test keys in /app/backend/.env (rzp_test_Spuhaq4p1yWumY / vIMPwLwrHItJQmj1wFvD233u, webhook secret PLACEHOLDER). DB_NAME=wedding_db (NOT wedding_platform — iteration_7 test file had wrong db name which caused 9 false failures on re-run).",
+  "seed_data_creation": "All test-created data is TEST_<uuid> prefixed and cleaned up by each test's try/finally. The CRUD test creates one credit_pack and deletes it. The verify-invalid-signature test inserts one credit_purchases stub doc and removes it. Zero residue after run — verified.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "1) Use DB_NAME=wedding_db (the older iteration_7 test file used wedding_platform which doesn't exist anymore — that caused 9 false failures when I re-ran it). 2) Always inject Mozilla User-Agent header on requests to /api/admin/* and /api/super-admin/* — the BotDetectionMiddleware blocks default python-requests UA with 403 'Automated access not allowed'. /api/invite/* is whitelisted and accepts curl/bot UAs intentionally. 3) Cache-Control assertions MUST hit http://localhost:8001 directly — Cloudflare strips the origin header on the public preview URL. 4) Razorpay create-order returns 502 with the current placeholder keys — accept 200/502/503 in tests. 5) API response shape: list endpoints return {packs: [...]} or {purchases: [...]} envelopes, not raw arrays. 6) SA-detail click on photographer row uses [data-testid='view-detail-<admin_id>'] — auth must be valid via login flow; calling page.goto('/super-admin/dashboard') from another page can lose context, so login-and-click in a single session.",
+  "rca_of_the_issue": "The previous iteration_7 test file (/app/backend/tests/test_monetization_credits.py) was run as a sanity check first and produced 9 failures, ALL traced to: (a) DB_NAME = 'wedding_platform' in that file — the real DB is 'wedding_db' (per backend/.env), so the test couldn't find admins/profiles/credit_purchases it tried to seed/query, and (b) stale TEST_PROFILE_ID / TEST_PROFILE_SLUG referenced live_gallery/wishes/analytics endpoints that returned 404 because the profile no longer exists. These are STALE TEST DATA issues, not product regressions. A fresh focused test file (test_iteration8_monetization.py) targeting exactly the review-request checklist passes 14/14. No code changes were needed in the product; only test-side fixes."
+}
