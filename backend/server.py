@@ -11839,6 +11839,19 @@ analytics_extras_router = build_analytics_extras_router(
 app.include_router(analytics_extras_router)
 
 # =====================================================================
+# Monetization — credit packs, Razorpay top-up, super-admin photographer detail
+# =====================================================================
+from monetization_features import build_monetization_router
+monetization_router = build_monetization_router(
+    db=db,
+    require_admin=require_admin,
+    require_super_admin=require_super_admin,
+    credit_service=credit_service,
+    razorpay_client=razorpay_client,
+)
+app.include_router(monetization_router)
+
+# =====================================================================
 # Sprint 8 — Smart Venue / Per-event maps / What3Words / Live ETA
 # =====================================================================
 from map_features import build_map_router

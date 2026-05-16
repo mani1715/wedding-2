@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import axios from 'axios';
 import {
   Users, UserPlus, Wallet, ShieldCheck, ShieldOff, Plus, Minus,
-  Search, TrendingUp, FileText, Crown, X, Check,
+  Search, TrendingUp, FileText, Crown, X, Check, Eye, Coins,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -141,9 +141,14 @@ const LuxurySuperAdminDashboard = () => {
         {/* Action bar */}
         {tab === 'admins' && (
           <div className="lux-glass p-5 mb-6 flex flex-wrap items-center justify-between gap-3">
-            <button onClick={() => setShowCreate(true)} className="lux-btn" data-testid="create-admin-btn">
-              <UserPlus className="w-4 h-4" /> Create Photographer
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setShowCreate(true)} className="lux-btn" data-testid="create-admin-btn">
+                <UserPlus className="w-4 h-4" /> Create Photographer
+              </button>
+              <button onClick={() => navigate('/super-admin/credit-packs')} className="lux-btn lux-btn-ghost" data-testid="credit-packs-btn">
+                <Coins className="w-4 h-4" /> Credit Packs
+              </button>
+            </div>
             <div className="relative w-full md:w-64">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,248,220,0.45)' }} />
               <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or email"
@@ -193,6 +198,7 @@ const LuxurySuperAdminDashboard = () => {
                   </div>
 
                   <div className="flex flex-wrap gap-2 text-xs">
+                    <ActionBtn icon={Eye}      label="Details" onClick={() => navigate(`/super-admin/photographers/${a.id}`)} testid={`view-detail-${a.id}`} />
                     <ActionBtn icon={Plus}    label="Add"    onClick={() => setCreditModal({ admin: a, mode: 'add' })}    testid={`add-credits-${a.id}`} />
                     <ActionBtn icon={Minus}   label="Deduct" onClick={() => setCreditModal({ admin: a, mode: 'deduct' })} testid={`deduct-credits-${a.id}`} />
                     <ActionBtn icon={FileText} label="Ledger" onClick={() => fetchLedger(a)} testid={`ledger-${a.id}`} />

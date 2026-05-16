@@ -58,7 +58,20 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Additional security headers
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-        
+
+        # Cache-Control for high-traffic public paths (preventive scaling).
+        # Uploaded images are content-addressed (uuid hex filenames) so they are
+        # safe to cache aggressively. Public read endpoints get a short TTL.
+        try:
+            path = request.url.path
+            if path.startswith("/api/uploads/"):
+                response.headers["Cache-Control"] = "public, max-age=86400, immutable"
+            elif path.startswith("/api/public/") or path.startswith("/api/invite/"):
+                if request.method == "GET":
+                    response.headers["Cache-Control"] = "public, max-age=30, s-maxage=60"
+        except Exception:
+            pass
+
         return response
 
 
@@ -168,6 +181,19 @@ class BotDetectionMiddleware(BaseHTTPMiddleware):
         
         # Skip bot detection for admin, API, and static endpoints
         if any(path.startswith(prefix) for prefix in ["/api/admin", "/api/auth", "/docs", "/openapi.json", "/robots.txt", "/sitemap.xml"]):
+            return await call_next(request)
+
+        # High-traffic public read paths — bypass bot detection so a viral
+        # invitation link can be opened by thousands of guests / link previewers
+        # without ever being soft-blocked.
+        if any(path.startswith(prefix) for prefix in [
+            "/api/invite",                       # invitation fetch
+            "/api/public",                       # public read endpoints
+            "/api/uploads/",                     # served image/audio files
+            "/api/ws/",                          # WebSocket connects
+            "/api/rsvp",                         # guest RSVP
+            "/api/payments/razorpay-webhook",    # razorpay webhook
+        ]):
             return await call_next(request)
 
         # PHASE 38: Whitelist programmatic upload endpoint when authenticated via X-Uploader-Token
@@ -323,6 +349,19 @@ class AbusePreventionMiddleware(BaseHTTPMiddleware):
         # Skip abuse detection for admin endpoints
         path = request.url.path
         if any(path.startswith(prefix) for prefix in ["/api/admin", "/api/auth", "/docs", "/openapi.json"]):
+            return await call_next(request)
+
+        # High-traffic public read paths — exempt from per-IP throttle so a
+        # viral wedding link doesn't soft-block real guests. (Trade-off vs DDoS
+        # — Cloudflare / ingress rate-limiting is the right layer for that.)
+        if any(path.startswith(prefix) for prefix in [
+            "/api/invite",
+            "/api/public",
+            "/api/uploads/",
+            "/api/ws/",
+            "/api/rsvp",
+            "/api/payments/razorpay-webhook",
+        ]):
             return await call_next(request)
         
         # Check if IP is soft blocked

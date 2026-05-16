@@ -263,8 +263,8 @@ const LuxuryDashboard = () => {
             <button onClick={() => navigate('/themes')} className="lux-btn lux-btn-ghost" data-testid="dashboard-browse-themes">
               Browse Themes <Layers className="w-4 h-4" />
             </button>
-            <button onClick={() => navigate('/admin/profile/new')} className="lux-btn" data-testid="dashboard-view-plans">
-              View Plans <ArrowUpRight className="w-4 h-4" />
+            <button onClick={() => navigate('/admin/credits/top-up')} className="lux-btn" data-testid="dashboard-top-up">
+              Top Up Credits <ArrowUpRight className="w-4 h-4" />
             </button>
           </div>
         </motion.div>

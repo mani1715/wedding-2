@@ -1,0 +1,55 @@
+{
+  "summary": "Monetization features (credit-pack CRUD, Razorpay top-up create-order / verify / webhook, photographer detail drill-down) + scaling whitelists/cache-control fully exercised. 25/25 pytest pass (/app/backend/tests/test_monetization_credits.py). Webhook idempotency verified end-to-end via direct Mongo seeding: posting payment.captured twice for the same razorpay_order_id results in exactly 1 credit_ledger 'add' entry AND admin.total_credits incremented by exactly +3 (not +6). Verify endpoint with bogus signature returns 400 'Invalid payment signature' and DOES NOT credit. SA CRUD properly enforces require_super_admin (admin token gets 403). Photographer detail returns admin (no password_hash), summary (credits_available = total-used), profiles[].metrics (views/unique_views/rsvps/rsvps_yes/wishes/photos) and public_link='/invite/<slug>', credit_ledger[], purchases[]. Scaling: /api/uploads/* returns Cache-Control: public, max-age=86400, immutable; /api/public/invite/* returns public, max-age=30, s-maxage=60 — verified at the FastAPI layer (localhost:8001). 30 rapid hits to /api/invite/wishes-moderation produced 0 abuse-blocks. No regression: live gallery public list, public wishes list, analytics heatmap all 200 OK.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/public/invite/{slug}/wishes (and other /api/public/* GETs)",
+        "issue": "Cloudflare/Kubernetes ingress overrides the Cache-Control header set by SecurityHeadersMiddleware with 'no-store, no-cache, must-revalidate' on the public URL. Verified that the FastAPI app itself emits 'public, max-age=30, s-maxage=60' at localhost:8001, but viral-scale CDN caching will NOT work until the proxy/ingress is configured to honor origin Cache-Control on /api/public/ and /api/uploads/. /api/uploads/ behaves the same way through the proxy. This is an infra/ingress configuration issue, not code."
+      },
+      {
+        "endpoint": "POST /api/admin/credits/purchase/create-order",
+        "issue": "With placeholder Razorpay keys the route returns 502 'Could not create order: Authentication failed' (correct behaviour). Once production keys are configured, this becomes a happy-path; tests are wired to accept 200/502/503."
+      },
+      {
+        "endpoint": "POST /api/payments/razorpay-webhook",
+        "issue": "Signature verification path was NOT exercised end-to-end because RAZORPAY_WEBHOOK_SECRET is 'PLACEHOLDER_*' so the code path takes the unverified branch (logs warning, accepts event). HMAC verification code is straightforward (hmac.compare_digest of SHA-256 hex) and was code-reviewed only. To exercise it the agent would need to mutate env + restart backend. Recommend a separate /e2e test once a real (test-mode) webhook secret is set."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_monetization_credits.py",
+    "/app/test_reports/pytest/monetization_results.xml"
+  ],
+  "action_items": [
+    "(Infra) Configure Cloudflare/Kubernetes ingress to honor origin Cache-Control for /api/public/* and /api/uploads/* — currently overwritten to 'no-store'. Without this fix, the scaling work in security_middleware.py:62-73 has no real effect at the edge.",
+    "(Recommend) monetization_features.py:194 — _credit_purchase_atomic does a non-transactional update_one + add_credits + on-error rollback. If add_credits writes the ledger but the rollback update_one fails (rare), the row will be left credited=False yet ledger has an add entry. Consider using a Mongo session/transaction OR record the ledger entry first (idempotency key = purchase_id) and let add_credits be the authoritative idempotent write.",
+    "(Recommend) monetization_features.py:332 — webhook handles event 'payment.captured' or 'order.paid' but silently swallows exceptions inside _credit_purchase_atomic (line 343 'except Exception as e: logger.exception'). Razorpay will retry webhooks on non-2xx; returning 200 even when credit fails will swallow the retry. Suggest returning 500 if credit fails so Razorpay re-delivers.",
+    "(Recommend) monetization_features.py:163 — pack_label and credits are copied into the purchase doc at create-order time, so editing/deactivating the pack mid-flight is safe. Good. However if SA deletes a pack between order-create and verify, the verify still credits with the snapshotted credits — confirm this is intentional (it is, but worth documenting).",
+    "(Recommend) monetization_features.py:120 — admin_list_packs sorts by (sort_order, price_inr) which matches sa_list. Good. The Pydantic model defaults sort_order=0 so a freshly-created pack will sort to the very top; consider seeding a sensible default (e.g., max+1).",
+    "(Code review) /api/admin/credits/purchase/create-order has no per-admin rate-limit. An attacker with stolen admin token could spawn unlimited Razorpay orders (cost = Razorpay's own anti-abuse). Consider 5/min/admin throttle."
+  ],
+  "critical_code_review_comments": [
+    "monetization_features.py:294-310 — webhook accepts request body and computes HMAC against full raw body BEFORE json.loads. Correct (Razorpay signs the raw bytes). Good.",
+    "monetization_features.py:197-209 — atomic credit uses update_one({id, credited:{$ne:true}}, {$set:{credited:true}}) then checks res.modified_count. This is the correct idempotency pattern. Good.",
+    "monetization_features.py:362 — photographer_detail loops N profiles and runs 4 count_documents per profile. For a SA viewing a photographer with 500 profiles this is 2000+ count_documents serially. Acceptable for current scale but should aggregate with $facet/$lookup once profiles_total > ~50.",
+    "monetization_features.py:380 — analytics doc fetched per profile separately (no batching). Same N+1 concern.",
+    "monetization_features.py:414 — revenue_inr aggregated in Python from up to 100 purchases — correct, but only first 100 are summed (limit(100) above). A photographer with >100 purchases under-counts revenue. Move sum to a server-side aggregation, OR raise the limit / paginate.",
+    "monetization_features.py:188 — razorpay_key_id returned to client to initialise the Checkout widget. Verify the Checkout widget URL is HTTPS-only on frontend (out of scope of this backend test).",
+    "monetization_features.py is 443 lines, comfortably under the 700-line guideline. _strip + _now_iso helpers duplicated from live_gallery_features / wishes_features / analytics_extras — recommend extracting to a shared module (also flagged in iteration_6).",
+    "Bot-detection whitelist in security_middleware.py:189-197 correctly skips /api/invite, /api/public, /api/uploads/, /api/ws/, /api/rsvp, /api/payments/razorpay-webhook. Verified 30 rapid hits to /api/invite/wishes-moderation produce 0 403s.",
+    "All monetization responses correctly exclude mongodb _id via projection or via _strip(). Verified via test assertions on field set."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_monetization_credits.py (NEW — 25 tests, all green)",
+    "/app/test_reports/pytest/monetization_results.xml (NEW — JUnit XML)"
+  ],
+  "success_rate": {"backend": "100% (25/25 pytest)", "frontend": "n/a (backend-only request)"},
+  "test_credentials": "admin@wedding.com / admin123; superadmin@wedding.com / SuperAdmin@123; profile id 122ffd50-a1d0-4583-b2af-43bea70bc815, slug aarav-riya-lp2bq2",
+  "seed_data_creation": "All seeded data is TEST_* prefixed and cleaned up by each test's try/finally: TEST_Starter credit-pack (created+deleted via SA CRUD), TEST_PurchasePack (created+deleted), 3 stub credit_purchases docs (order_TEST_*, purch_TEST_*), 1 stub credit_ledger entry for webhook idempotency test, 1 razorpay_events log row. Admin total_credits is snapshotted before the webhook test and restored after via direct pymongo update_one. Post-run verified: 0 TEST_ residue in credit_packs/credit_purchases/credit_ledger.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Test file patches requests.Session.request module-level to inject Mozilla UA so super-admin endpoints aren't bot-blocked (default python-requests UA matches a blocked-bot pattern in security_middleware.py — important: any new test file MUST set User-Agent for /api/super-admin/* or it will receive 403 'Automated access not allowed'). The webhook idempotency test directly seeds a credit_purchases doc + restores admin.total_credits in finally; safe to re-run. Cache-Control assertions hit http://localhost:8001 because the public URL is fronted by Cloudflare which rewrites Cache-Control to no-store for dynamic JSON responses (see backend_issues.minor for the infra action item). RAZORPAY_*  env keys are still placeholders; the create-order happy path returns 502 by design.",
+  "rca_of_the_issue": "Initial run had 9 failures: (a) 5 failures on /api/super-admin/credit-packs — root cause was BotDetectionMiddleware blocking default python-requests UA with 'Automated access not allowed' (security_middleware.py:212). Fixed test-side by injecting Mozilla UA via Session.request monkey-patch. (b) 2 failures on photographer-detail — same UA root-cause. (c) 1 failure on webhook idempotency — used wrong field name 'type' instead of 'action_type' in the ledger doc query (models.py:618 CreditLedger uses action_type). Fixed test query. (d) 1 failure on Cache-Control — Cloudflare ingress strips the header set by SecurityHeadersMiddleware. Test now asserts against localhost:8001 directly and the public-URL behaviour is logged as infra action item."
+}

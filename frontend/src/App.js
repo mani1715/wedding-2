@@ -46,6 +46,11 @@ import ProfileForm from './pages/ProfileForm';
 import PublicInvitation from './pages/PublicInvitation';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 
+// Monetization (credit packs, top-up, photographer detail)
+import CreditPacksAdmin from './pages/CreditPacksAdmin';
+import PhotographerDetail from './pages/PhotographerDetail';
+import CreditsTopUp from './pages/CreditsTopUp';
+
 import './App.css';
 
 function App() {
@@ -116,6 +121,11 @@ function App() {
                 <Route path="/admin/profile/:profileId/gallery" element={<GalleryManager />} />
                 <Route path="/live/:profileId" element={<PhotographerLiveMode />} />
                 <Route path="/invite/:slug/live-gallery" element={<LivePhotoWall />} />
+
+                {/* Monetization */}
+                <Route path="/super-admin/credit-packs" element={<CreditPacksAdmin />} />
+                <Route path="/super-admin/photographers/:adminId" element={<PhotographerDetail />} />
+                <Route path="/admin/credits/top-up" element={<CreditsTopUp />} />
               </Routes>
             </BrowserRouter>
           </div>
