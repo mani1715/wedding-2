@@ -1,0 +1,44 @@
+{
+  "summary": "Session 4 (5-feature) end-to-end regression — 7/7 backend tests pass, full frontend editor flow (Couple/Theme/Events/Venue/Media) verified against live preview URL. Backend: GET /api/music/presets returns 20 CC0 tracks (no auth, exactly 4 devotional with the four titled tracks); POST /api/admin/profiles persists custom_text._maja {bride_photo_url, groom_photo_url, couple_photo_url, venue_google_map_link, events_extended (stringified JSON of 2 events)} + map_settings.map_link and round-trips intact on GET /api/admin/profiles/{id}; POST /api/admin/profiles/{id}/upload-photo with a real PIL-generated tiny JPEG returns ProfileMedia (id + file_size > 0). Regression: photographer admin list still includes the Aarav&Riya demo (groom=Aarav, bride=Riya, slug=aarav-and-riya-demo); SA detail /api/super-admin/photographers/604db096-c1ca-4738-8663-7e640334a6ac/detail returns summary.views_total=142, summary.rsvps_total=5 and the demo profile carries metrics.views=142. Frontend (admin@wedding.com / admin123 → /admin/profile/<demo-id>/edit): Couple step shows upload-bride / upload-groom / upload-couple slots; Theme step renders 10 theme-pick-* and 10 theme-preview-* buttons; clicking a preview opens theme-preview-modal containing theme-preview-iframe (src='/preview/luxe?theme=royal_mughal') + theme-preview-use + theme-preview-new-tab + theme-preview-close; Events step's add-event creates a row with ALL 13 expected testids (event-type/title/date/time/venue/address/map/dresscode/desc/hero/link/copy/open-0) — per-event link card appears because slug exists; Venue step exposes field-venue/field-venue-address/field-venue-map and venue-map-test-link appears with correct href when the map URL is filled; Media step shows music-preset-picker > music-preset-grid with 20 preset cards, 20 play + 20 pick buttons, 6 mood filter chips, custom-music-url + custom-music-pick; mood-devotional filter narrows to exactly 4 visible pick buttons; clicking preset-pick-preset-01 marks the card with 'Picked'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/profiles/{id}/upload-photo", "issue": "Response payload uses keys {id, file_size, created_at, caption, ...} but does not expose file_url/url directly in the inspected payload. PhotoUploadField in frontend reads these — verify all consumers use the canonical field name or extend ProfileMedia response to always include a public URL."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Loading existing profile into Events editor", "issue": "Demo invitation has events persisted under custom_text._maja.events_extended but on opening /admin/profile/<demo-id>/edit the Events step renders zero rows until 'Add Ceremony' is clicked. Per-event details from events_extended do not appear to hydrate the editor UI on load (they did persist in DB and round-trip correctly via API).", "affected_selectors": ["[data-testid^='event-type-']","[data-testid^='event-title-']"]}
+    ],
+    "design_issues": [
+      {"screen": "Wedding editor (all steps)", "issues": ["Tailwind CDN warning in console — 'cdn.tailwindcss.com should not be used in production'. Switch to PostCSS build or Tailwind CLI before launch."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration10_session4.py",
+    "/app/test_reports/pytest/iteration10.xml"
+  ],
+  "action_items": [
+    "(Minor) Hydrate EventsEditor state from custom_text._maja.events_extended on profile load so saved events appear without requiring 'Add Ceremony' click.",
+    "(Minor) Move Tailwind from CDN to a built pipeline (PostCSS) — production warning currently leaking to console.",
+    "(Optional) Add file_url to /api/admin/profiles/{id}/upload-photo response for consistency with other media endpoints."
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/music_presets.py — clean, well-scoped router; public GET endpoint correctly placed outside auth. 20 tracks split 4/4/4/4/3 across moods + extra pleasant tail = 20.",
+    "/app/backend/server.py:11858 — music router included via build_music_router(); no /api prefix duplication issue.",
+    "Frontend testid coverage is excellent — every spec'd selector is present (theme preview/pick, event row fields, music presets, mood chips, custom URL, venue map link).",
+    "ThemePreviewModal iframe src correctly uses /preview/luxe?theme=<id> route as documented in App.js:74."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration10_session4.py (NEW — 7 tests, all green)",
+    "/app/test_reports/pytest/iteration10.xml (NEW — JUnit XML)"
+  ],
+  "success_rate": {"backend": "100% (7/7 pytest)", "frontend": "100% (all spec'd testids + interactive flows verified)"},
+  "test_credentials": "Photographer admin@wedding.com / admin123 ; Super admin superadmin@wedding.com / SuperAdmin@123. Demo photographer id 604db096-c1ca-4738-8663-7e640334a6ac, demo profile id c0a45a19-8751-4846-8805-ab2500709220, slug aarav-and-riya-demo. UA 'Mozilla/5.0' required for /api/admin/*, /api/auth/*, /api/super-admin/*. /api/music/presets is technically public but also gated by the same bot-detection middleware — UA must be set.",
+  "seed_data_creation": "1 TEST_Groom_<rand> / TEST_Bride_<rand> draft profile created on demo photographer for round-trip test + photo upload. Demo invitation (Aarav&Riya) untouched. Cleanup endpoint for drafts not invoked.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "1) Demo profile id c0a45a19-8751-4846-8805-ab2500709220 — open /admin/profile/<that>/edit to see per-event link cards (requires slug). 2) On a brand-new /admin/profile/new the Couple step shows 'Save the draft once to enable photo uploads' — this is intentional, PhotoUploadField only mounts after id exists. 3) Step navigation in the luxury editor uses buttons whose names match 'Couple/Theme/Story/Events/Venue/Media/Features/Publish' — selector 'button:has-text(\"<step>\")' works reliably (no [data-testid=\"step-*\"] currently). 4) The Events editor does NOT auto-hydrate from custom_text._maja.events_extended on load (see frontend_issues). 5) Music presets endpoint is public but bot-detection-gated → set UA. 6) Use Pillow-generated JPEG in upload tests; hand-rolled hex bytes failed PIL validation.",
+  "rca of the issue": "n/a — no blocking issues found."
+}

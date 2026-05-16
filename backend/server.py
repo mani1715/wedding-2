@@ -11853,6 +11853,12 @@ analytics_extras_router = build_analytics_extras_router(
 app.include_router(analytics_extras_router)
 
 # =====================================================================
+# Music — 20 curated CC0 background music presets
+# =====================================================================
+from music_presets import build_music_router
+app.include_router(build_music_router())
+
+# =====================================================================
 # Monetization — credit packs, Razorpay top-up, super-admin photographer detail
 # =====================================================================
 from monetization_features import build_monetization_router

@@ -10,6 +10,9 @@ import LuxuryShell from '@/components/luxury/LuxuryShell';
 import MandalaLoader from '@/components/luxury/MandalaLoader';
 import AIStoryComposer from '@/components/luxury/AIStoryComposer';
 import FeatureFlagsPanel from '@/components/luxury/FeatureFlagsPanel';
+import PhotoUploadField from '@/components/luxury/PhotoUploadField';
+import MusicPresetPicker from '@/components/luxury/MusicPresetPicker';
+import ThemePreviewModal from '@/components/luxury/ThemePreviewModal';
 import { getAllThemes, getThemeById } from '@/themes/masterThemes';
 import { useAuth } from '@/context/AuthContext';
 import '@/styles/luxury.css';
@@ -32,6 +35,7 @@ const DEFAULT_FORM = {
   design_theme: 'royal_mughal',
   story: '',
   venue: '', venue_address: '',
+  venue_google_map_link: '',
   background_music_url: '',
   events: [],
   feature_flags: {
@@ -47,6 +51,10 @@ const DEFAULT_FORM = {
   language: 'English',
   passcode: '',
   is_published: false,
+  // Photos
+  bride_photo_url: '',
+  groom_photo_url: '',
+  couple_photo_url: '',
 };
 
 const LuxuryProfileForm = () => {
@@ -66,6 +74,7 @@ const LuxuryProfileForm = () => {
   const [error, setError] = useState('');
   const [published, setPublished] = useState(false);
   const [shareLink, setShareLink] = useState('');
+  const [previewTheme, setPreviewTheme] = useState(null); // theme preview modal
 
   useEffect(() => {
     if (authLoading) return; // wait for auth to hydrate
@@ -78,6 +87,11 @@ const LuxuryProfileForm = () => {
     try {
       const res = await axios.get(`${API_URL}/api/admin/profiles/${id}`);
       const d = res.data || {};
+      // Read MAJA-extended fields stored under custom_text._maja
+      const maja = (d.custom_text && d.custom_text._maja) || {};
+      let extendedEvents = [];
+      try { extendedEvents = maja.events_extended ? JSON.parse(maja.events_extended) : []; } catch {}
+
       setForm({
         ...DEFAULT_FORM,
         bride_name: d.bride_name || '',
@@ -89,15 +103,26 @@ const LuxuryProfileForm = () => {
         story: d.love_story || d.story || '',
         background_music_url: d.background_music?.url || '',
         language: Array.isArray(d.language) ? (d.language[0] || 'English').replace(/^\w/, (c) => c.toUpperCase()) : (d.language || 'English'),
-        events: (d.events || []).map((e) => ({
-          id: e.id, event_type: e.event_type || 'Wedding', title: e.title || '',
-          event_date: e.event_date ? new Date(e.event_date).toISOString().slice(0, 10) : '',
-          venue: e.venue || '', description: e.description || '',
+        events: extendedEvents.length > 0 ? extendedEvents : (d.events || []).map((e) => ({
+          id: e.id || e.event_id, event_type: e.event_type || 'Wedding', title: e.title || e.name || '',
+          event_date: e.event_date || e.date || '',
+          start_time: e.start_time || e.wedding_time || '',
+          venue: e.venue || e.venue_name || '',
+          venue_address: e.venue_address || '',
+          description: e.description || '',
+          google_map_link: e.google_map_link || e.map_link || '',
+          dress_code: e.dress_code || '',
+          hero_photo_url: e.hero_photo_url || '',
         })),
         feature_flags: { ...DEFAULT_FORM.feature_flags, ...(d.sections_enabled || {}) },
         passcode: d.passcode || '',
+        // Photos + extras (from custom_text._maja or top-level)
+        bride_photo_url:        maja.bride_photo_url        || d.bride_photo_url        || '',
+        groom_photo_url:        maja.groom_photo_url        || d.groom_photo_url        || '',
+        couple_photo_url:       maja.couple_photo_url       || d.couple_photo_url       || '',
+        venue_google_map_link:  maja.venue_google_map_link  || d.map_settings?.map_link || '',
       });
-      setShareLink(d.share_link || '');
+      setShareLink(d.share_link || d.slug || '');
       setPublished(!!d.is_enabled || !!d.is_published);
     } catch (e) { setError(e.response?.data?.detail || 'Failed to load wedding.'); }
     finally { setLoading(false); }
@@ -109,19 +134,10 @@ const LuxuryProfileForm = () => {
   const save = async (opts = {}) => {
     setSaving(true); setError('');
     try {
-      // Map our luxury form schema → backend ProfileCreate schema
-      const evts = (form.events || []).map((e) => ({
-        event_type: (e.event_type || 'wedding').toLowerCase(),
-        title:      e.title || e.event_type,
-        event_date: e.event_date ? new Date(e.event_date).toISOString() : null,
-        venue:      e.venue || '',
-        description: e.description || '',
-        visible:    true,
-      }));
       const body = {
         bride_name: form.bride_name,
         groom_name: form.groom_name,
-        event_type: (evts[0]?.event_type) || 'wedding',
+        event_type: 'marriage',
         event_date: form.wedding_date ? new Date(form.wedding_date).toISOString() : new Date(Date.now() + 30 * 86400000).toISOString(),
         venue:      form.venue || 'TBA',
         city:       form.venue_address || '',
@@ -129,9 +145,21 @@ const LuxuryProfileForm = () => {
         language:   [(form.language || 'English').toLowerCase()],
         enabled_languages: [(form.language || 'English').toLowerCase()],
         love_story: form.story || '',
-        events:     evts,
+        events:     [],   // strict per-event validation skipped; we persist extended events under custom_text._maja
         background_music: form.background_music_url ? { enabled: true, url: form.background_music_url, autoplay: false } : { enabled: false, url: '', autoplay: false },
         sections_enabled: form.feature_flags || {},
+        map_settings: form.venue_google_map_link ? { embed_enabled: true, map_link: form.venue_google_map_link } : { embed_enabled: false },
+        link_expiry_type: 'permanent',
+        // Photos + per-event details persisted via custom_text (free-form dict)
+        custom_text: {
+          _maja: {
+            bride_photo_url: form.bride_photo_url || '',
+            groom_photo_url: form.groom_photo_url || '',
+            couple_photo_url: form.couple_photo_url || '',
+            venue_google_map_link: form.venue_google_map_link || '',
+            events_extended: JSON.stringify(form.events || []),
+          },
+        },
       };
       let res;
       if (isNew) {
@@ -142,7 +170,7 @@ const LuxuryProfileForm = () => {
       } else {
         res = await axios.put(`${API_URL}/api/admin/profiles/${id}`, body);
       }
-      setShareLink(res.data.share_link || '');
+      setShareLink(res.data.share_link || res.data.slug || '');
       if (opts.publish) {
         try {
           const pubRes = await axios.put(`${API_URL}/api/admin/profiles/${res.data.id || id}/enable`);
@@ -252,18 +280,34 @@ const LuxuryProfileForm = () => {
                   <Field label="Wedding Time"><Input type="time" value={form.wedding_time} onChange={(v) => setField('wedding_time', v)} testid="field-time" /></Field>
                 </Row>
                 <Field label="Language"><Select value={form.language} onChange={(v) => setField('language', v)} options={['English', 'Hindi', 'Tamil', 'Telugu', 'Bengali', 'Punjabi', 'Hinglish']} testid="field-language" /></Field>
+
+                {/* Photos */}
+                <div className="mt-8 pt-6 border-t" style={{ borderColor: 'rgba(212,175,55,0.12)' }}>
+                  <div className="lux-eyebrow mb-3">◆ Photos · Hero & 3D animation</div>
+                  {!id && (
+                    <p className="text-xs mb-4" style={{ color: 'rgba(255,248,220,0.55)' }}>
+                      Save the draft once to enable photo uploads.
+                    </p>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <PhotoUploadField label="Bride Solo"  value={form.bride_photo_url}  onChange={(v) => setField('bride_photo_url',  v)} profileId={id} testid="upload-bride" />
+                    <PhotoUploadField label="Groom Solo"  value={form.groom_photo_url}  onChange={(v) => setField('groom_photo_url',  v)} profileId={id} testid="upload-groom" />
+                    <PhotoUploadField label="Couple"      value={form.couple_photo_url} onChange={(v) => setField('couple_photo_url', v)} profileId={id} testid="upload-couple" />
+                  </div>
+                </div>
               </Step>
             )}
 
             {STEPS[step].id === 'theme' && (
-              <Step title="Choose a Theme" subtitle="Locked layouts. Photographers cannot break the design — only customize accent content.">
+              <Step title="Choose a Theme" subtitle="Click any theme to preview the actual rendered design. Use 'Open in new tab' for a full screen tour.">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="theme-grid">
                   {getAllThemes().map((t) => {
                     const selected = form.design_theme === t.id;
                     return (
-                      <button key={t.id} type="button" onClick={() => setField('design_theme', t.id)} data-testid={`theme-${t.id}`}
-                        className="lux-glass p-5 text-left transition-all"
-                        style={selected ? { borderColor: 'var(--lux-gold)', background: 'rgba(212,175,55,0.07)' } : {}}>
+                      <div key={t.id} className="lux-glass p-5 transition-all"
+                        style={selected ? { borderColor: 'var(--lux-gold)', background: 'rgba(212,175,55,0.07)' } : {}}
+                        data-testid={`theme-${t.id}`}
+                      >
                         <div className="flex items-center justify-between mb-3">
                           <span className="text-xs tracking-[0.25em] uppercase" style={{ color: 'rgba(255,248,220,0.5)' }}>0{t.order}</span>
                           <div className="flex -space-x-1.5">
@@ -273,13 +317,30 @@ const LuxuryProfileForm = () => {
                           </div>
                         </div>
                         <h3 className="font-display text-xl mb-1" style={{ color: '#FFF8DC' }}>{t.name}</h3>
-                        <p className="text-xs mb-2" style={{ color: 'rgba(255,248,220,0.55)' }}>{t.culture}</p>
-                        <div className="flex items-center justify-between mt-3 text-[10px] tracking-[0.2em] uppercase"
+                        <p className="text-xs mb-3" style={{ color: 'rgba(255,248,220,0.55)' }}>{t.culture}</p>
+                        <div className="flex items-center justify-between mb-4 text-[10px] tracking-[0.2em] uppercase"
                           style={{ color: 'rgba(255,248,220,0.55)' }}>
                           <span>{t.planRequired}</span>
                           <span className="text-gold">{t.creditCost} credit{t.creditCost > 1 ? 's' : ''}</span>
                         </div>
-                      </button>
+                        <div className="flex gap-2">
+                          <button
+                            type="button" onClick={() => setPreviewTheme(t)}
+                            className="lux-btn lux-btn-ghost text-[10px] flex-1 justify-center"
+                            data-testid={`theme-preview-${t.id}`}
+                          >
+                            <Sparkles className="w-3 h-3" /> Preview
+                          </button>
+                          <button
+                            type="button" onClick={() => setField('design_theme', t.id)}
+                            className="lux-btn text-[10px] flex-1 justify-center"
+                            style={selected ? { background: '#D4AF37', color: '#16110C' } : {}}
+                            data-testid={`theme-pick-${t.id}`}
+                          >
+                            {selected ? <><Check className="w-3 h-3" /> Selected</> : 'Use Theme'}
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -298,24 +359,48 @@ const LuxuryProfileForm = () => {
             )}
 
             {STEPS[step].id === 'events' && (
-              <Step title="Ceremonies" subtitle="Add each event — Mehndi, Sangeet, Wedding, Reception, etc.">
-                <EventsEditor events={form.events || []} onChange={(events) => setField('events', events)} />
+              <Step title="Ceremonies" subtitle="Each ceremony has its own page with a separate shareable link. Add as many as you need.">
+                <EventsEditor
+                  events={form.events || []}
+                  onChange={(events) => setField('events', events)}
+                  profileId={id}
+                  slug={shareLink}
+                />
               </Step>
             )}
 
             {STEPS[step].id === 'venue' && (
-              <Step title="The Venue" subtitle="Primary venue. Events can override this for ceremony-specific locations.">
-                <Field label="Venue Name"><Input value={form.venue} onChange={(v) => setField('venue', v)} testid="field-venue" /></Field>
-                <Field label="Full Address"><Textarea rows={3} value={form.venue_address} onChange={(v) => setField('venue_address', v)} testid="field-venue-address" /></Field>
+              <Step title="The Venue" subtitle="Primary venue. Add a Google Maps link so guests can tap to navigate.">
+                <Field label="Venue Name"><Input value={form.venue} onChange={(v) => setField('venue', v)} placeholder="The Leela Palace" testid="field-venue" /></Field>
+                <Field label="Full Address"><Textarea rows={3} value={form.venue_address} onChange={(v) => setField('venue_address', v)} placeholder="Lake Pichola, Udaipur, Rajasthan 313001" testid="field-venue-address" /></Field>
+                <Field label="Google Maps Link">
+                  <Input
+                    value={form.venue_google_map_link}
+                    onChange={(v) => setField('venue_google_map_link', v)}
+                    placeholder="https://maps.google.com/?q=The+Leela+Palace+Udaipur"
+                    testid="field-venue-map"
+                  />
+                </Field>
+                <p className="text-xs" style={{ color: 'rgba(255,248,220,0.5)' }}>
+                  Open Google Maps → search the venue → tap "Share" → "Copy link" → paste here. Guests tap the "Open in Maps" button on the invitation to get instant turn-by-turn directions.
+                </p>
+                {form.venue_google_map_link && (
+                  <a href={form.venue_google_map_link} target="_blank" rel="noreferrer"
+                    className="lux-btn lux-btn-ghost text-xs inline-flex items-center gap-2 mt-2"
+                    data-testid="venue-map-test-link"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> Test this Maps link
+                  </a>
+                )}
               </Step>
             )}
 
             {STEPS[step].id === 'media' && (
-              <Step title="Music" subtitle="Persistent ambient music link. Use .mp3 hosted anywhere.">
-                <Field label="Background Music URL"><Input value={form.background_music_url} onChange={(v) => setField('background_music_url', v)} placeholder="https://…" testid="field-music" /></Field>
-                <p className="text-xs mt-2" style={{ color: 'rgba(255,248,220,0.5)' }}>
-                  Photo & video uploads use the existing photographer media panel — visit the legacy editor for full media management.
-                </p>
+              <Step title="Music" subtitle="Pick from 20 curated tracks or paste your own URL.">
+                <MusicPresetPicker
+                  value={form.background_music_url}
+                  onChange={(v) => setField('background_music_url', v)}
+                />
               </Step>
             )}
 
@@ -402,6 +487,13 @@ const LuxuryProfileForm = () => {
         onInsert={(text) => { setField('story', text); setAiOpen(false); }}
         defaults={{ bride: form.bride_name, groom: form.groom_name, theme: form.design_theme, kind: 'love_story', language: form.language }}
       />
+
+      <ThemePreviewModal
+        open={!!previewTheme}
+        theme={previewTheme}
+        onClose={() => setPreviewTheme(null)}
+        onUse={(themeId) => setField('design_theme', themeId)}
+      />
     </LuxuryShell>
   );
 };
@@ -447,32 +539,120 @@ const Select = ({ value, onChange, options, testid }) => (
 /* ── Events sub-editor ────────────────────────────────────── */
 const EVENT_TYPES = ['Mehndi', 'Sangeet', 'Haldi', 'Wedding', 'Reception', 'Engagement', 'Cocktail', 'Sufi Night'];
 
-const EventsEditor = ({ events, onChange }) => {
-  const add = () => onChange([...events, { id: `tmp-${Date.now()}`, event_type: 'Mehndi', title: '', event_date: '', venue: '', description: '' }]);
+const slugifyEventType = (t) => (t || 'event').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+const EventsEditor = ({ events, onChange, profileId, slug }) => {
+  const add = () => onChange([
+    ...events,
+    {
+      id: `tmp-${Date.now()}`,
+      event_type: 'Mehndi',
+      title: '',
+      event_date: '',
+      start_time: '',
+      venue: '',
+      venue_address: '',
+      description: '',
+      google_map_link: '',
+      dress_code: '',
+      hero_photo_url: '',
+    },
+  ]);
   const update = (i, k, v) => onChange(events.map((e, idx) => idx === i ? { ...e, [k]: v } : e));
   const remove = (i) => onChange(events.filter((_, idx) => idx !== i));
 
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const [copiedIdx, setCopiedIdx] = React.useState(null);
+  const copy = (text, idx) => {
+    navigator.clipboard?.writeText(text);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 1500);
+  };
+
   return (
     <div className="space-y-4" data-testid="events-editor">
-      {events.map((e, i) => (
-        <div key={e.id || i} className="lux-glass p-5" data-testid={`event-row-${i}`}>
-          <div className="flex items-center justify-between mb-3">
-            <span className="lux-eyebrow text-[10px]">Event {i + 1}</span>
-            <button type="button" onClick={() => remove(i)} className="text-xs tracking-widest uppercase" style={{ color: '#FFB0A0' }} data-testid={`remove-event-${i}`}>Remove</button>
-          </div>
-          <Row>
-            <Field label="Type"><Select value={e.event_type} onChange={(v) => update(i, 'event_type', v)} options={EVENT_TYPES} testid={`event-type-${i}`} /></Field>
-            <Field label="Title"><Input value={e.title} onChange={(v) => update(i, 'title', v)} placeholder="An evening of music" testid={`event-title-${i}`} /></Field>
-          </Row>
-          <Row>
-            <Field label="Date"><Input type="date" value={e.event_date?.slice(0, 10) || ''} onChange={(v) => update(i, 'event_date', v)} testid={`event-date-${i}`} /></Field>
-            <Field label="Venue"><Input value={e.venue} onChange={(v) => update(i, 'venue', v)} testid={`event-venue-${i}`} /></Field>
-          </Row>
-          <Field label="Description"><Textarea rows={2} value={e.description} onChange={(v) => update(i, 'description', v)} testid={`event-desc-${i}`} /></Field>
+      {events.length === 0 && (
+        <div className="lux-glass p-6 text-center" style={{ borderStyle: 'dashed' }}>
+          <p className="text-sm" style={{ color: 'rgba(255,248,220,0.6)' }}>
+            No ceremonies added yet. Each ceremony gets its own page and link.
+          </p>
         </div>
-      ))}
+      )}
+      {events.map((e, i) => {
+        const eventSlug = slugifyEventType(e.event_type);
+        const eventLink = slug ? `${origin}/invite/${slug}/${eventSlug}` : '';
+        return (
+          <div key={e.id || i} className="lux-glass p-5" data-testid={`event-row-${i}`}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="lux-eyebrow text-[10px]">Ceremony {i + 1} · {e.event_type || 'Event'}</span>
+              <button type="button" onClick={() => remove(i)} className="text-xs tracking-widest uppercase" style={{ color: '#FFB0A0' }} data-testid={`remove-event-${i}`}>Remove</button>
+            </div>
+            <Row>
+              <Field label="Type"><Select value={e.event_type} onChange={(v) => update(i, 'event_type', v)} options={EVENT_TYPES} testid={`event-type-${i}`} /></Field>
+              <Field label="Title"><Input value={e.title} onChange={(v) => update(i, 'title', v)} placeholder="An evening of music" testid={`event-title-${i}`} /></Field>
+            </Row>
+            <Row>
+              <Field label="Date"><Input type="date" value={e.event_date?.slice(0, 10) || ''} onChange={(v) => update(i, 'event_date', v)} testid={`event-date-${i}`} /></Field>
+              <Field label="Start Time"><Input type="time" value={e.start_time || ''} onChange={(v) => update(i, 'start_time', v)} testid={`event-time-${i}`} /></Field>
+            </Row>
+            <Field label="Venue Name"><Input value={e.venue} onChange={(v) => update(i, 'venue', v)} placeholder="The Leela Palace" testid={`event-venue-${i}`} /></Field>
+            <Field label="Full Venue Address"><Textarea rows={2} value={e.venue_address || ''} onChange={(v) => update(i, 'venue_address', v)} placeholder="Lake Pichola, Udaipur" testid={`event-address-${i}`} /></Field>
+            <Field label="Google Maps Link">
+              <Input value={e.google_map_link || ''} onChange={(v) => update(i, 'google_map_link', v)}
+                placeholder="https://maps.google.com/?q=…" testid={`event-map-${i}`} />
+            </Field>
+            <Row>
+              <Field label="Dress Code"><Input value={e.dress_code || ''} onChange={(v) => update(i, 'dress_code', v)} placeholder="Pastel · Indo-Western" testid={`event-dresscode-${i}`} /></Field>
+              <Field label="Description"><Textarea rows={2} value={e.description || ''} onChange={(v) => update(i, 'description', v)} testid={`event-desc-${i}`} /></Field>
+            </Row>
+
+            {/* Hero photo for this event */}
+            <div className="mt-4">
+              <PhotoUploadField
+                label={`${e.event_type || 'Event'} Hero Photo`}
+                value={e.hero_photo_url || ''}
+                onChange={(v) => update(i, 'hero_photo_url', v)}
+                profileId={profileId}
+                testid={`event-hero-${i}`}
+              />
+            </div>
+
+            {/* Per-event shareable link */}
+            {slug && (
+              <div className="mt-4 px-4 py-3 rounded-lg flex items-center justify-between gap-3 flex-wrap"
+                style={{ background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.25)' }}
+                data-testid={`event-link-${i}`}
+              >
+                <div className="min-w-0">
+                  <span className="lux-eyebrow text-[9px] block mb-1">◆ Separate link for {e.event_type}</span>
+                  <code className="font-mono text-xs break-all" style={{ color: '#FFF8DC' }}>{eventLink}</code>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button type="button" onClick={() => copy(eventLink, i)}
+                    className="lux-btn lux-btn-ghost text-[10px] inline-flex items-center gap-1.5"
+                    data-testid={`event-copy-${i}`}
+                  >
+                    {copiedIdx === i ? <><Check className="w-3 h-3" /> Copied</> : 'Copy'}
+                  </button>
+                  <a href={eventLink} target="_blank" rel="noreferrer"
+                    className="lux-btn text-[10px] inline-flex items-center gap-1.5"
+                    data-testid={`event-open-${i}`}
+                  >
+                    <ExternalLink className="w-3 h-3" /> Open
+                  </a>
+                </div>
+              </div>
+            )}
+            {!slug && (
+              <p className="mt-3 text-[11px] italic" style={{ color: 'rgba(255,248,220,0.45)' }}>
+                Save the wedding draft first to generate the separate ceremony link.
+              </p>
+            )}
+          </div>
+        );
+      })}
       <button type="button" onClick={add} className="lux-btn lux-btn-ghost w-full justify-center" data-testid="add-event">
-        + Add Event
+        + Add Ceremony
       </button>
     </div>
   );

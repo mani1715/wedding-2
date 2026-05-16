@@ -94,4 +94,10 @@ User cloned `https://github.com/mani1715/wedding-2`. Previous E1 session impleme
 3. Consider adding a "Plans & Pricing" tab on the super-admin dashboard that surfaces total revenue across all photographers, top spenders, MoM growth
 
 ## Last updated
-2026-05-16 — Session 3 — Added: Super-admin "Create Invitation" UI flow + on-behalf-of backend support, fixed password-mismatch bug in Create Photographer modal, fixed pre-existing auth-race redirect on dashboards, seeded full demo invitation with 6 photos / 5 RSVPs / 5 wishes / 142 views.
+2026-05-16 — Session 4 — Major editor enhancements:
+- **Theme step**: 10 themes now have a PREVIEW button (modal lightbox with iframe to `/preview/luxe?theme=<id>`) + Open-in-new-tab + Use-Theme buttons
+- **Couple step**: 3 photo upload slots (Bride / Groom / Couple) → backend `/api/admin/profiles/{id}/upload-photo`
+- **Events step**: Each ceremony now has separate Date, Time, Venue, Full Address, **Google Maps Link**, Dress Code, Description, **Hero Photo** AND a visible **per-event shareable link** (`/invite/<slug>/<event_type>`) with Copy + Open buttons
+- **Venue step**: New **Google Maps Link** field with instructions + "Test this Maps link" button
+- **Media step**: Replaced raw URL input with **20 curated CC0 music presets** carousel (4 devotional, 4 classical, 4 pleasant, 4 cinematic, 4 romantic), inline audio preview, mood filter, custom-URL fallback
+- **Backend**: New `music_presets.py` module + `GET /api/music/presets`. Extended editor fields persisted under `custom_text._maja` (free-form dict on Profile) so we don't break existing schema validators.
